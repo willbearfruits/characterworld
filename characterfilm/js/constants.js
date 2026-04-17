@@ -87,3 +87,13 @@ export const DEFAULT_FPS = 12;
 export const DEFAULT_COLS = 120;
 export const DEFAULT_ROWS = 60;
 export const HIST_MAX = 64;
+
+// Grid-size presets. Character cells render ~2x taller than wide, so a ~2:1 cols:rows
+// ratio feels square on screen. Pick a larger preset for a smaller font / finer resolution.
+export const GRID_PRESETS = [
+  { label: 'XS',  cols: 60,  rows: 30  },
+  { label: 'S',   cols: 100, rows: 50  },
+  { label: 'M',   cols: 160, rows: 80  },
+  { label: 'L',   cols: 240, rows: 120 },
+  { label: 'XL',  cols: 320, rows: 160 },
+];

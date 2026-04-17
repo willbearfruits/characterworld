@@ -1,5 +1,5 @@
 import { state, setStatus } from './state.js';
-import { RAMPS, RAMP_NAMES, THEME_NAMES, MODES, GLYPH_PICKER, COLOR_MODES, SRC_NONE, SRC_WEBCAM } from './constants.js';
+import { RAMPS, RAMP_NAMES, THEME_NAMES, MODES, GLYPH_PICKER, COLOR_MODES, SRC_NONE, SRC_WEBCAM, GRID_PRESETS } from './constants.js';
 import { hexOfPalette, paletteSize, nameOfPalette } from './video.js';
 import * as vid from './video.js';
 import * as tl from './timeline.js';
@@ -258,6 +258,19 @@ function drawPanelKnobs(px, py, pw) {
   drawButton('src:webcam', 'WEBCAM', px + 1, y, 10, state.sourceKind === 1);
   drawButton('src:video',  'VIDEO',  px + 12, y, 9, state.sourceKind === 2);
   drawButton('src:image',  'IMAGE',  px + 22, y, 9, state.sourceKind === 3);
+  y += 2;
+
+  // Grid-density presets — smaller font = larger preset.
+  uiText('GRID', px + 1, y, UI_MID, 0.85);
+  uiText(state.cols + '×' + state.rows, px + pw - 2 - (state.cols + '×' + state.rows).length, y, UI_DIM, 0.8);
+  y++;
+  let gx = px + 1;
+  for (let i = 0; i < GRID_PRESETS.length; i++) {
+    const p = GRID_PRESETS[i];
+    const active = state.cols === p.cols && state.rows === p.rows;
+    drawButton('grid:' + i, p.label, gx, y, 4, active);
+    gx += 5;
+  }
   y += 2;
 
   meterRow('k:brightness', 'BRT', k.brightness, -100, 100, px + 1, y++, pw - 2, UI_INK);
@@ -702,6 +715,23 @@ function dispatch(id) {
   if (id === 'k:theme+')       { k.themeIdx = (k.themeIdx + 1) % THEME_NAMES.length; state.live.dirty = true; return true; }
   if (id.startsWith('k:ink:'))   { k.inkColor = parseInt(id.slice(6), 10); state.live.dirty = true; return true; }
   if (id.startsWith('k:cmode:')) { k.colorMode = parseInt(id.slice(8), 10); state.live.dirty = true; return true; }
+
+  // Grid presets — change resolution (smaller font when cols/rows grow).
+  if (id.startsWith('grid:')) {
+    const i = parseInt(id.slice(5), 10);
+    const p = GRID_PRESETS[i];
+    if (!p) return true;
+    if (state.cols === p.cols && state.rows === p.rows) return true;
+    if (state.frames.length > 0) {
+      openIo('Change grid to ' + p.cols + '×' + p.rows + '?',
+        `<p>This clears ${state.frames.length} existing frame${state.frames.length === 1 ? '' : 's'} because the grid size change invalidates their content.</p>`,
+        'CLEAR & RESIZE', () => { tl.clearAllFrames(); tl.resetGridTo(p.cols, p.rows); },
+        'CANCEL', null);
+    } else {
+      tl.resetGridTo(p.cols, p.rows);
+    }
+    return true;
+  }
 
   // glyph/color
   if (id.startsWith('glyph:')) { state.brushGlyph = GLYPH_PICKER[parseInt(id.slice(6), 10)]; return true; }
