@@ -32,6 +32,7 @@ function restore(s) {
   state.fps = s.fps;
   state.frames = s.frames.map(cloneFrame);
   state.knobs = JSON.parse(JSON.stringify(s.knobs));
+  state.selection = null;
   state.live.dirty = true;
 }
 

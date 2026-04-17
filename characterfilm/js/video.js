@@ -1,5 +1,6 @@
 import { state, setStatus } from './state.js';
-import { RAMPS, RAMP_NAMES, THEMES, THEME_NAMES, SRC_NONE, SRC_WEBCAM, SRC_VIDEO, SRC_IMAGE } from './constants.js';
+import { RAMPS, RAMP_NAMES, THEMES, THEME_NAMES, SRC_NONE, SRC_WEBCAM, SRC_VIDEO, SRC_IMAGE, MAX_FRAMES } from './constants.js';
+import { pushHistory } from './history.js';
 
 const srcVideo = document.getElementById('src');
 
@@ -61,6 +62,95 @@ export async function loadVideoFile(file) {
   } catch (e) {
     setStatus('video playback blocked — click to enable');
   }
+}
+
+// Seek the <video> element to t seconds and resolve when the frame is ready.
+// Falls back after a short timeout so broken codecs don't hang the bake.
+function seekTo(t) {
+  return new Promise((res) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      srcVideo.removeEventListener('seeked', finish);
+      res();
+    };
+    srcVideo.addEventListener('seeked', finish);
+    try { srcVideo.currentTime = t; } catch (e) { finish(); return; }
+    setTimeout(finish, 1500);
+  });
+}
+
+// Import a video file by seeking through it at `fps` and baking each sampled
+// frame into state.frames[]. Runs through sampleFrame() so current knobs apply.
+// opts: { fps (defaults to state.fps), append (bool), onProgress(doneCount,total) }
+export async function bakeVideoToFrames(file, opts = {}) {
+  const fps = opts.fps || state.fps;
+  const append = !!opts.append;
+
+  stopSource();
+  const url = URL.createObjectURL(file);
+  srcVideo.src = url;
+  srcVideo.loop = false;
+  srcVideo.muted = true;
+  srcVideo.playsInline = true;
+  try {
+    await new Promise((res, rej) => {
+      const ok = () => { cleanup(); res(); };
+      const bad = () => { cleanup(); rej(new Error('video load failed')); };
+      const cleanup = () => {
+        srcVideo.removeEventListener('loadedmetadata', ok);
+        srcVideo.removeEventListener('error', bad);
+      };
+      srcVideo.addEventListener('loadedmetadata', ok);
+      srcVideo.addEventListener('error', bad);
+    });
+  } catch (e) {
+    setStatus('video load failed');
+    return 0;
+  }
+
+  // Nudge playback once so some codecs populate the first frame.
+  try { await srcVideo.play(); srcVideo.pause(); } catch (e) {}
+
+  state.sourceKind = SRC_VIDEO;
+  state.sourceReady = true;
+  state.sourceLabel = 'video: ' + file.name;
+
+  const dur = isFinite(srcVideo.duration) ? srcVideo.duration : 0;
+  if (!dur) {
+    setStatus('video has no duration');
+    return 0;
+  }
+
+  pushHistory(append ? 'APPEND VIDEO' : 'IMPORT VIDEO');
+  if (!append) state.frames = [];
+
+  const step = 1 / fps;
+  const budget = Math.max(0, MAX_FRAMES - state.frames.length);
+  const total = Math.min(budget, Math.max(1, Math.floor(dur / step)));
+
+  for (let i = 0; i < total; i++) {
+    const t = Math.min(dur - 0.001, i * step);
+    await seekTo(t);
+    sampleFrame();
+    state.frames.push({
+      chars: state.live.chars.slice(),
+      colors: new Uint8Array(state.live.colors),
+      marks: new Uint8Array(state.live.marks),
+    });
+    if ((i & 3) === 0) {
+      setStatus('importing ' + (i + 1) + '/' + total + '…');
+      await new Promise(r => setTimeout(r, 0));
+    }
+    if (opts.onProgress) opts.onProgress(i + 1, total);
+  }
+
+  srcVideo.pause();
+  state.current = append ? (state.current >= 0 ? state.current : state.frames.length - total) : 0;
+  state.viewMode = 'frame';
+  setStatus('imported ' + total + ' frames @ ' + fps + 'fps');
+  return total;
 }
 
 export async function loadImageFile(file) {

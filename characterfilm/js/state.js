@@ -52,6 +52,12 @@ export const state = {
   // view mode for main viewport
   viewMode: 'live',     // 'live' | 'frame'
 
+  // onion skin: draw prev/next frames as ghosts behind the current one
+  onion: { enabled: false, range: 1 }, // range = how many frames on each side (1..3)
+
+  // range selection on the timeline (inclusive); null = no selection
+  selection: null,
+
   // tools
   mode: 'BRUSH',
   brushGlyph: '●',

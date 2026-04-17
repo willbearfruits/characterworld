@@ -118,6 +118,7 @@ const MENUS = {
     { id: '---' },
     { id: 'file:webcam', label: 'Open webcam',     key: 'W' },
     { id: 'file:video',  label: 'Load video…',     key: '' },
+    { id: 'file:bake',   label: 'Import video as clip…', key: '' },
     { id: 'file:image',  label: 'Load image…',     key: '' },
     { id: 'file:stop',   label: 'Stop source',     key: '' },
     { id: '---' },
@@ -141,8 +142,20 @@ const MENUS = {
     { id: 'frame:step-', label: 'Step back',       key: '←' },
     { id: 'frame:dup',   label: 'Duplicate frame', key: 'Ctrl+J' },
     { id: 'frame:del',   label: 'Delete frame',    key: 'Del' },
-    { id: 'frame:clear', label: 'Clear timeline',  key: '' },
+    { id: 'frame:shift-', label: 'Move frame left',  key: 'Alt+←' },
+    { id: 'frame:shift+', label: 'Move frame right', key: 'Alt+→' },
     { id: '---' },
+    { id: 'frame:selall', label: 'Select all',      key: 'Ctrl+A' },
+    { id: 'frame:selnone', label: 'Deselect',       key: 'Ctrl+D' },
+    { id: 'frame:seldel', label: 'Delete range',    key: 'Shift+Del' },
+    { id: 'frame:seldup', label: 'Duplicate range', key: 'Ctrl+Shift+J' },
+    { id: 'frame:selrev', label: 'Reverse range',   key: '' },
+    { id: '---' },
+    { id: 'frame:onion',  label: 'Onion skin on/off', key: 'O' },
+    { id: 'frame:onion-', label: 'Onion range −',    key: ',' },
+    { id: 'frame:onion+', label: 'Onion range +',    key: '.' },
+    { id: '---' },
+    { id: 'frame:clear', label: 'Clear timeline',  key: '' },
     { id: 'frame:view',  label: 'Toggle live/frame', key: 'Tab' },
   ],
   HELP: [
@@ -442,9 +455,10 @@ function drawViewport(L) {
   state._artOx = ox;
   state._artOy = oy;
 
-  // frame choice: when in 'live' view or no frames, show live buffer; when frame mode, show that frame. Onion skin not drawn yet.
+  // frame choice: when in 'live' view or no frames, show live buffer; when frame mode, show that frame.
   let frame;
-  if (state.viewMode === 'frame' && state.current >= 0 && state.current < state.frames.length) {
+  const showingStoredFrame = state.viewMode === 'frame' && state.current >= 0 && state.current < state.frames.length;
+  if (showingStoredFrame) {
     frame = state.frames[state.current];
   } else {
     frame = state.live;
@@ -483,8 +497,32 @@ function drawViewport(L) {
   ctx.textBaseline = 'top';
   ctx.textAlign = 'center';
 
-  // Register per-cell hit-rects for editing (only when in a frame).
-  const paintable = state.viewMode === 'frame' && state.current >= 0;
+  // Onion skin: draw prev (cool) / next (warm) frames as ghosts under the current frame.
+  if (showingStoredFrame && state.onion.enabled && state.frames.length > 1) {
+    const range = state.onion.range;
+    const coolHex = hexOfPalette(5); // COOL
+    const warmHex = hexOfPalette(4); // WARM
+    for (let d = -range; d <= range; d++) {
+      if (d === 0) continue;
+      const fi = state.current + d;
+      if (fi < 0 || fi >= state.frames.length) continue;
+      const ghost = state.frames[fi];
+      const dist = Math.abs(d);
+      const alpha = Math.max(0.08, 0.42 - (dist - 1) * 0.14);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = d < 0 ? coolHex : warmHex;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = y * cols + x;
+          const ch = ghost.chars[i];
+          if (ch && ch !== ' ') {
+            ctx.fillText(ch, ox + x * cellW + cellW / 2, oy + y * cellH + 1);
+          }
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
 
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
@@ -507,6 +545,10 @@ function drawViewport(L) {
   uiText(label, cornL + 1, cornT, state.viewMode === 'frame' ? UI_HI : UI_ACC, 0.9);
   const sizeLabel = ` ${cols}×${rows} `;
   uiText(sizeLabel, cornR - sizeLabel.length, cornT, UI_DIM, 0.7);
+  if (state.onion.enabled && showingStoredFrame) {
+    const ol = ` ONION ±${state.onion.range} `;
+    uiText(ol, cornL + 1, cornB, UI_ACC, 0.85);
+  }
 }
 
 // ---- timeline strip ----
@@ -541,6 +583,13 @@ function drawTimeline(L) {
     offset = Math.max(0, Math.min(total - stripW, (state.current < 0 ? 0 : state.current) - half));
   }
   addButton('tl:strip', stripX, stripY, stripW, 1);
+  // Selection bounds (normalized).
+  let selA = -1, selB = -1;
+  if (state.selection) {
+    const s = state.selection;
+    selA = Math.max(0, Math.min(total - 1, Math.min(s.start, s.end)));
+    selB = Math.max(0, Math.min(total - 1, Math.max(s.start, s.end)));
+  }
   // Register per-frame hit-rects (limit by stripW).
   for (let i = 0; i < stripW; i++) {
     const fi = offset + i;
@@ -550,8 +599,12 @@ function drawTimeline(L) {
     }
     addButton('tl:frame:' + fi, stripX + i, stripY, 1, 1);
     const isCur = fi === state.current;
-    const ch = isCur ? '█' : '▆';
-    uiChar(ch, stripX + i, stripY, isCur ? UI_HI : UI_DIM, isCur ? 1 : 0.65);
+    const inSel = selA >= 0 && fi >= selA && fi <= selB;
+    let ch, col, a;
+    if (isCur)      { ch = '█'; col = UI_HI;   a = 1; }
+    else if (inSel) { ch = '▇'; col = UI_ACC;  a = 0.85; }
+    else            { ch = '▆'; col = UI_DIM;  a = 0.65; }
+    uiChar(ch, stripX + i, stripY, col, a);
   }
   // Playhead indicator
   if (state.current >= 0 && state.current < total) {
@@ -563,7 +616,9 @@ function drawTimeline(L) {
 
   // Scale ticks
   if (total > 0) {
-    uiText(`${total} frames · ${state.fps}fps · ${(total / Math.max(1, state.fps)).toFixed(1)}s`, stripX, T.t + 4, UI_DIM, 0.8);
+    let info = `${total} frames · ${state.fps}fps · ${(total / Math.max(1, state.fps)).toFixed(1)}s`;
+    if (selA >= 0) info += `  ·  SEL ${selA + 1}–${selB + 1} (${selB - selA + 1})`;
+    uiText(info, stripX, T.t + 4, UI_DIM, 0.8);
   } else {
     uiText('no frames — press R to record from source, or C to capture', stripX, T.t + 4, UI_DIM, 0.75);
   }
@@ -662,6 +717,7 @@ function dispatch(id) {
   if (id === 'file:qload')  { close(); ex.quickLoad(); return true; }
   if (id === 'file:webcam' || id === 'src:webcam') { close(); vid.startWebcam(); return true; }
   if (id === 'file:video'  || id === 'src:video')  { close(); document.getElementById('filePick').setAttribute('data-kind', 'video'); document.getElementById('filePick').click(); return true; }
+  if (id === 'file:bake') { close(); document.getElementById('filePick').setAttribute('data-kind', 'bake-video'); document.getElementById('filePick').click(); return true; }
   if (id === 'file:image'  || id === 'src:image')  { close(); document.getElementById('filePick').setAttribute('data-kind', 'image'); document.getElementById('filePick').click(); return true; }
   if (id === 'file:stop')   { close(); vid.stopSource(); return true; }
   if (id === 'file:png')    { close(); ex.exportPng(); return true; }
@@ -686,7 +742,23 @@ function dispatch(id) {
   if (id === 'frame:clear' || id === 'tl:clear') { close(); tl.clearAllFrames(); return true; }
   if (id === 'frame:view' || id === 'tl:live')   { close(); state.viewMode = state.viewMode === 'live' ? 'frame' : 'live'; if (state.viewMode === 'frame' && state.current < 0 && state.frames.length) state.current = 0; return true; }
 
-  if (id.startsWith('tl:frame:')) { const i = parseInt(id.slice(9), 10); tl.gotoFrame(i); return true; }
+  if (id === 'frame:shift-') { close(); tl.shiftCurrent(-1); return true; }
+  if (id === 'frame:shift+') { close(); tl.shiftCurrent( 1); return true; }
+  if (id === 'frame:selall') { close(); tl.selectAll(); return true; }
+  if (id === 'frame:selnone'){ close(); tl.clearSelection(); return true; }
+  if (id === 'frame:seldel') { close(); tl.deleteRange(); return true; }
+  if (id === 'frame:seldup') { close(); tl.duplicateRange(); return true; }
+  if (id === 'frame:selrev') { close(); tl.reverseRange(); return true; }
+  if (id === 'frame:onion')  { close(); tl.toggleOnion(); return true; }
+  if (id === 'frame:onion-') { close(); tl.bumpOnionRange(-1); return true; }
+  if (id === 'frame:onion+') { close(); tl.bumpOnionRange( 1); return true; }
+
+  if (id.startsWith('tl:frame:')) {
+    const i = parseInt(id.slice(9), 10);
+    if (state._clickShift) tl.extendSelectionTo(i);
+    else { tl.clearSelection(); tl.gotoFrame(i); }
+    return true;
+  }
   if (id === 'tl:strip') return true;
 
   // tools

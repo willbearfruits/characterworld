@@ -141,7 +141,109 @@ export function clearAllFrames() {
   state.viewMode = 'live';
   state.recording = false;
   state.playing = false;
+  state.selection = null;
   setStatus('timeline cleared');
+}
+
+// Return {a, b} normalized inclusive range from state.selection, clamped.
+// If there's no selection, returns the single current frame (or null).
+export function normalizedSelection() {
+  if (state.selection) {
+    let { start, end } = state.selection;
+    start = Math.max(0, Math.min(state.frames.length - 1, start));
+    end   = Math.max(0, Math.min(state.frames.length - 1, end));
+    const a = Math.min(start, end), b = Math.max(start, end);
+    return { a, b };
+  }
+  if (state.current >= 0 && state.current < state.frames.length) {
+    return { a: state.current, b: state.current };
+  }
+  return null;
+}
+
+export function clearSelection() { state.selection = null; }
+
+export function selectAll() {
+  if (!state.frames.length) return;
+  state.selection = { start: 0, end: state.frames.length - 1 };
+}
+
+export function extendSelectionTo(i) {
+  if (!state.frames.length) return;
+  const anchor = state.selection ? state.selection.start : (state.current < 0 ? 0 : state.current);
+  state.selection = { start: anchor, end: Math.max(0, Math.min(state.frames.length - 1, i)) };
+  state.current = i;
+  state.viewMode = 'frame';
+  state.playing = false;
+}
+
+export function deleteRange() {
+  const r = normalizedSelection();
+  if (!r) return;
+  pushHistory('DEL RANGE');
+  state.frames.splice(r.a, r.b - r.a + 1);
+  state.selection = null;
+  if (state.frames.length === 0) {
+    state.current = -1;
+    state.viewMode = 'live';
+  } else {
+    state.current = Math.min(r.a, state.frames.length - 1);
+  }
+  setStatus('deleted ' + (r.b - r.a + 1) + ' frame(s)');
+}
+
+export function duplicateRange() {
+  const r = normalizedSelection();
+  if (!r) return;
+  const copies = [];
+  for (let i = r.a; i <= r.b; i++) {
+    const src = state.frames[i];
+    copies.push({
+      chars: src.chars.slice(),
+      colors: new Uint8Array(src.colors),
+      marks: new Uint8Array(src.marks),
+    });
+  }
+  if (state.frames.length + copies.length > MAX_FRAMES) {
+    setStatus('would exceed max frames (' + MAX_FRAMES + ')');
+    return;
+  }
+  pushHistory('DUP RANGE');
+  state.frames.splice(r.b + 1, 0, ...copies);
+  state.selection = { start: r.b + 1, end: r.b + copies.length };
+  state.current = r.b + copies.length;
+  setStatus('duplicated ' + copies.length + ' frame(s)');
+}
+
+export function reverseRange() {
+  const r = normalizedSelection();
+  if (!r || r.a === r.b) return;
+  pushHistory('REV RANGE');
+  const chunk = state.frames.slice(r.a, r.b + 1).reverse();
+  for (let i = 0; i < chunk.length; i++) state.frames[r.a + i] = chunk[i];
+  setStatus('reversed ' + chunk.length + ' frame(s)');
+}
+
+export function shiftCurrent(dir) {
+  if (state.current < 0 || state.current >= state.frames.length) return;
+  const i = state.current, j = i + dir;
+  if (j < 0 || j >= state.frames.length) return;
+  pushHistory('SHIFT FRAME');
+  const tmp = state.frames[i];
+  state.frames[i] = state.frames[j];
+  state.frames[j] = tmp;
+  state.current = j;
+  if (state.selection) state.selection = null; // simpler
+}
+
+export function toggleOnion() {
+  state.onion.enabled = !state.onion.enabled;
+  setStatus('onion skin ' + (state.onion.enabled ? 'on' : 'off') + ' (range ±' + state.onion.range + ')');
+}
+
+export function bumpOnionRange(d) {
+  state.onion.range = Math.max(1, Math.min(3, state.onion.range + d));
+  if (state.onion.enabled) setStatus('onion range ±' + state.onion.range);
 }
 
 export function resetGridTo(cols, rows) {

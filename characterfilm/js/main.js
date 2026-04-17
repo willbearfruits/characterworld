@@ -76,7 +76,9 @@ cv.addEventListener('pointerdown', (e) => {
   cv.setPointerCapture?.(e.pointerId);
 
   // UI click path first
+  state._clickShift = !!e.shiftKey;
   const handled = ui.handleUIClick(state.pointer.col, state.pointer.row, state.pointer.over === 'art');
+  state._clickShift = false;
   if (handled) { state.pointer.down = false; return; }
 
   // Art-grid interaction (painting / eyedrop / fill)
@@ -130,12 +132,28 @@ document.getElementById('filePick').addEventListener('change', async (e) => {
   const f = e.target.files?.[0];
   if (!f) return;
   const kind = e.target.getAttribute('data-kind');
+  e.target.value = '';
+  if (kind === 'bake-video') {
+    const run = (append) => vid.bakeVideoToFrames(f, { fps: state.fps, append });
+    if (state.frames.length > 0) {
+      openIo(
+        'Import video as clip',
+        `<p>You have <b>${state.frames.length}</b> frame(s) in the timeline.<br>
+         Sampling at <b>${state.fps}fps</b> with current knobs.<br>
+         Replace them, or append the new clip?</p>`,
+        'REPLACE', () => { run(false); },
+        'APPEND',  () => { run(true); },
+      );
+    } else {
+      run(false);
+    }
+    return;
+  }
   if (kind === 'image' || f.type.startsWith('image/')) {
     await vid.loadImageFile(f);
   } else {
     await vid.loadVideoFile(f);
   }
-  e.target.value = '';
 });
 document.getElementById('projPick').addEventListener('change', async (e) => {
   const f = e.target.files?.[0];
@@ -157,7 +175,11 @@ window.addEventListener('keydown', (e) => {
   if (ctrl && shift && (k === 's' || k === 'S')) { e.preventDefault(); ex.quickSave(); return; }
   if (ctrl && !shift && (k === 'o' || k === 'O')) { e.preventDefault(); document.getElementById('projPick').click(); return; }
   if (ctrl && shift && (k === 'o' || k === 'O')) { e.preventDefault(); ex.quickLoad(); return; }
+  if (ctrl && shift && (k === 'j' || k === 'J')) { e.preventDefault(); tl.duplicateRange(); return; }
   if (ctrl && (k === 'j' || k === 'J')) { e.preventDefault(); tl.duplicateCurrentFrame(); return; }
+  if (ctrl && (k === 'a' || k === 'A')) { e.preventDefault(); tl.selectAll(); return; }
+  if (ctrl && (k === 'd' || k === 'D')) { e.preventDefault(); tl.clearSelection(); return; }
+  if (shift && (k === 'Delete' || k === 'Backspace')) { e.preventDefault(); tl.deleteRange(); return; }
   if (!ctrl && (k === 'Delete' || k === 'Backspace')) { tl.deleteCurrentFrame(); return; }
 
   if (k === 'Escape') { state.menuOpen = null; return; }
@@ -170,8 +192,15 @@ window.addEventListener('keydown', (e) => {
   }
   if (k === 'w' || k === 'W') { vid.startWebcam(); return; }
   if (k === 'Tab') { e.preventDefault(); state.viewMode = state.viewMode === 'live' ? 'frame' : 'live'; if (state.viewMode === 'frame' && state.current < 0 && state.frames.length) state.current = 0; return; }
+  if (e.altKey && k === 'ArrowRight') { e.preventDefault(); tl.shiftCurrent( 1); return; }
+  if (e.altKey && k === 'ArrowLeft')  { e.preventDefault(); tl.shiftCurrent(-1); return; }
+  if (shift && k === 'ArrowRight') { e.preventDefault(); tl.extendSelectionTo((state.current < 0 ? 0 : state.current) + 1); return; }
+  if (shift && k === 'ArrowLeft')  { e.preventDefault(); tl.extendSelectionTo((state.current < 0 ? 0 : state.current) - 1); return; }
   if (k === 'ArrowRight') { tl.stepForward(); return; }
   if (k === 'ArrowLeft') { tl.stepBack(); return; }
+  if (k === 'o' || k === 'O') { tl.toggleOnion(); return; }
+  if (k === ',') { tl.bumpOnionRange(-1); return; }
+  if (k === '.') { tl.bumpOnionRange( 1); return; }
   if (k === '[') { state.brushSize = Math.max(1, state.brushSize - 1); return; }
   if (k === ']') { state.brushSize = Math.min(8, state.brushSize + 1); return; }
   if (k === '?') { e.preventDefault(); import('./ui.js'); /* help dialog comes via menu */ openHelp(); return; }
@@ -188,6 +217,10 @@ function openHelp() {
       <kbd>W</kbd> webcam &middot; <kbd>R</kbd> record/stop &middot; <kbd>Space</kbd> play<br>
       <kbd>C</kbd> capture &middot; <kbd>←</kbd>/<kbd>→</kbd> step &middot; <kbd>Tab</kbd> live/frame<br>
       <kbd>B</kbd>/<kbd>P</kbd>/<kbd>E</kbd>/<kbd>F</kbd>/<kbd>I</kbd> tools &middot; <kbd>[</kbd>/<kbd>]</kbd> brush<br>
+      <kbd>O</kbd> onion skin &middot; <kbd>,</kbd>/<kbd>.</kbd> onion range<br>
+      <kbd>Shift+←</kbd>/<kbd>→</kbd> extend selection &middot; <kbd>Ctrl+A</kbd> all &middot; <kbd>Ctrl+D</kbd> none<br>
+      <kbd>Shift+Del</kbd> delete range &middot; <kbd>Ctrl+Shift+J</kbd> dup range<br>
+      <kbd>Alt+←</kbd>/<kbd>→</kbd> move frame in timeline<br>
       <kbd>Ctrl+Z</kbd>/<kbd>Y</kbd> undo/redo<br>
       <kbd>Ctrl+S</kbd> save &middot; <kbd>Ctrl+O</kbd> open<br>
       <kbd>Ctrl+Shift+S/O</kbd> quick save/load<br>
