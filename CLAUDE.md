@@ -2,38 +2,74 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Law (read first)
+## What this folder is
 
-This project is **character-only**. Every visible subject, UI control, cursor, border, particle, texture, and effect must be built from typed glyphs (ASCII, Unicode, box/block elements, punctuation, combining marks). The full policy lives in `AGENTS.md` and `skills/character-only-art/SKILL.md` — they are authoritative.
+`characterworld/` is a **meta-folder** hosting multiple related character-only browser pieces. Each project lives in its own subdirectory at the root; the root itself is a small directory/landing page and the shared policy scaffolding.
+
+Current children:
+
+- `charactershop/` — the flagship. Photoshop-style character-only paint program. Single HTML file. See `charactershop/CLAUDE.md` for its architecture.
+
+Future children will be added as sibling directories (e.g. `characterfield/`, `charactertype/`, etc.). Each child is a self-contained single-file project; they share policy but not code.
+
+## Project Law (applies to every child and the root)
+
+This project is **character-only**. Every visible subject, UI control, cursor, border, particle, texture, and effect must be built from typed glyphs (ASCII, Unicode, box/block elements, punctuation, combining marks). The full policy lives in `AGENTS.md` and `skills/character-only-art/SKILL.md` — they are authoritative and shared across every child project.
 
 Forbidden as visible subject matter: `<img>`, `<svg>`, `<video>`, sprite sheets, icon fonts used pictorially, 3D models, canvas `arc`/`rect`/`path` geometry, and CSS decorative shapes (blobs, gradient-as-art, border-radius cards, shadows carrying the art). Allowed: canvas `fillText`/`strokeText`, DOM text, CSS for layout/color/font/transforms only, and plain background fills that exist solely as a stage for characters.
 
-When a feature seems to require an image, redesign it as character art (glyph cluster, density-map figure, ASCII composition) — do not reach for SVG or shapes.
+Exception: OpenGraph/social-card PNGs inside child projects (e.g. `charactershop/og.png`, `charactershop/hero.png`) are metadata for external platforms — their pixels happen to depict character art. Do not reach for bitmap assets inside any `index.html`.
+
+## Layout
+
+```
+characterworld/
+├─ index.html              root landing page — character-only directory of sibling projects
+├─ CLAUDE.md               this file (meta-level)
+├─ AGENTS.md               shared character-only policy (authoritative)
+├─ skills/
+│  └─ character-only-art/  shared policy skill
+├─ charactershop/          flagship: Photoshop-style paint program
+│  ├─ index.html
+│  ├─ CLAUDE.md            project-specific guidance
+│  ├─ README.md
+│  ├─ LICENSE
+│  ├─ og.png, og-small.png, hero.png
+```
+
+The root `index.html` is a live, character-only directory page — it must itself obey project law (no images/SVG/path geometry in its rendering).
 
 ## Commands
 
-There is no build system, package manager, lint, or test suite. Artifacts are standalone HTML files.
+No build system, package manager, lint, or test suite. Everything is static HTML + vanilla JS.
 
-- Run: open `index.html` directly in a browser, or serve the directory (`python3 -m http.server 8000`) and visit the file.
-- There is nothing to install and no dependencies to manage.
+- Run everything locally: `python3 -m http.server 8000` then:
+  - `http://localhost:8000/` → root directory page
+  - `http://localhost:8000/charactershop/` → atelier
+- Syntax-check a child's JS (example for charactershop): `sed -n '27,2453p' charactershop/index.html > /tmp/cw.js && node --check /tmp/cw.js` (adjust line range if the file grows).
+- Syntax-check the root landing page JS: `sed -n '/<script>/,/<\/script>/p' index.html | sed '1d;$d' > /tmp/cw-root.js && node --check /tmp/cw-root.js`.
+- Deploy: merging to `main` auto-publishes the whole tree to GitHub Pages:
+  - Root: `https://willbearfruits.github.io/characterworld/`
+  - Atelier: `https://willbearfruits.github.io/characterworld/charactershop/`
+  - Build status: `gh api repos/willbearfruits/characterworld/pages/builds/latest --jq '.status'`.
 
-## Architecture
+## Adding a new sibling project
 
-Current artifact is a single file: `index.html` (~960 lines) — a character-only paint tool called "characterworld paint". All other browser pieces added to this repo should follow the same standalone single-file pattern unless a framework is already present.
+1. Create a new top-level directory at the repo root, e.g. `charactermuseum/`.
+2. Inside it, follow the single-file standalone pattern: one `index.html`, no framework, fullscreen canvas, `fillText` only, system cursor hidden.
+3. If the project warrants it, add a project-specific `charactermuseum/CLAUDE.md` with its architecture (see `charactershop/CLAUDE.md` as the template). Keep the meta-level rules (this file + `AGENTS.md`) inherited by reference, not duplicated.
+4. Add an entry to `ENTRIES` in the root `index.html` so the directory page lists it.
+5. If the project wants a social card, generate `charactermuseum/og.png` (1200×630) and wire its OG meta tags to `https://willbearfruits.github.io/characterworld/charactermuseum/og.png`.
 
-The rendering model in `index.html` is the reference pattern for new pieces:
+Do **not**:
+- Pull child-project files up to the root.
+- Add frameworks, bundlers, or npm dependencies.
+- Introduce image/SVG/icon assets as visible subject matter in any `index.html`.
+- Add a root-level `index.html` that delegates to a child via `<meta http-equiv="refresh">` — the root directory page is its own character-only piece and the primary entry point.
 
-- **Two nested character grids on one fullscreen canvas.** A coarse UI grid (`cols`×`rows` at `cell` px) hosts panels, meters, and buttons; a finer "art" grid (`artCols`×`artRows` at `artCell` px) is the drawing surface. Both are rendered by iterating cells and calling `fillText` — no path geometry.
-- **State lives in flat typed arrays** sized `artCols*artRows`: `chars` (string cells), `colors` (Uint8Array indexing into `COLORS`), `heat` (Float32Array for decay/glow), `marks` (Uint8Array for combining-mark overlays: above/below/strike). Index helper: `idx(x,y) = y*artCols + x`.
-- **`resize()` is the pivot.** It recomputes DPR, font size, UI and art cell metrics, and `cols`/`rows`, then calls `layout()`, which recomputes the art viewport and **reallocates all grid buffers while preserving overlap from the old grid**. Any new persistent per-cell state must be added to both the allocation block in `layout()` and the copy-over loop that follows.
-- **Palettes are index-based arrays**: `GLYPHS`, `COLORS` (`[name, hex]` pairs), `MODES`, `SHORT_MODE`, plus combining-mark sets `ABOVE`/`BELOW`/`STRIKE` and a `DENSITY` ramp. Add to these rather than introducing ad-hoc literals.
-- **UI is drawn, not DOM.** `button()`, `meter()`, `signedMeter()`, `box()`, `colorSwatch()`, `commandGroup()` all emit text via `text()` and push hit-test rects into a `buttons` array that is rebuilt each frame. Interaction is pointer coordinates → cell → lookup against `buttons`. Do not introduce HTML form elements for controls — keep affordances textual (bracketed labels, glyph cursors, terminal panels).
-- **Undo is snapshot-based**: `pushUndo()` captures `chars`/`colors`/`marks` via `snapshot()`; history is capped at 30. New per-cell state that should be undoable must be added to both `snapshot()` and `restore()`.
-- **System cursor is hidden** (`body{cursor:none}`) because a character cursor replaces it. If you hide the cursor anywhere else, you must render a glyph cursor in its place.
+## Deployment
 
-## When adding a new piece
-
-- Prefer a new standalone HTML file at the repo root over adding a framework.
-- Keep `resize()` responsible for all metric/buffer recomputation; do not scatter font or column math across handlers.
-- Use typed arrays for any grid ≥ a few thousand cells.
-- Do not add image preloads, icon libraries, or SVG assets to the repo — the `character-only-art` skill's review checklist will reject them.
+- Repo: `willbearfruits/characterworld` (public)
+- Pages: `main` branch, root, auto-deploys on push
+- The root `index.html` is what renders at `.../characterworld/`; each child renders at `.../characterworld/<child>/`.
+- Social preview at the repo root reuses `charactershop/og.png` via absolute URL in the root's OG meta tags (the atelier is the flagship; a dedicated root image can replace it later).
