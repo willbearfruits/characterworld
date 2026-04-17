@@ -151,7 +151,7 @@ const MENUS = {
   ],
 };
 
-function drawMenus(L) {
+function drawMenuBar(L) {
   const labels = Object.keys(MENUS);
   let c = 1;
   for (const name of labels) {
@@ -179,37 +179,45 @@ function drawMenus(L) {
   } else {
     uiText(' ' + state.frames.length + ' frames ', L.uiCols - 14, 0, UI_DIM, 0.8);
   }
+}
 
-  // Dropdown
-  if (state.menuOpen) {
-    const items = MENUS[state.menuOpen];
-    if (items) {
-      // find x position of opened menu
-      let x = 1;
-      for (const name of labels) {
-        if (name === state.menuOpen) break;
-        x += (' ' + name + ' ').length + 1;
+function drawMenuDropdown(L) {
+  if (!state.menuOpen) return;
+  const items = MENUS[state.menuOpen];
+  if (!items) return;
+  const labels = Object.keys(MENUS);
+  // find x position of opened menu
+  let x = 1;
+  for (const name of labels) {
+    if (name === state.menuOpen) break;
+    x += (' ' + name + ' ').length + 1;
+  }
+  const maxLabel = Math.max(...items.map(i => i.id === '---' ? 0 : i.label.length));
+  const maxKey = Math.max(...items.map(i => i.id === '---' ? 0 : (i.key || '').length));
+  const w = maxLabel + maxKey + 4;
+  const y = 1;
+  // clip x so the dropdown stays within the canvas
+  const xAdj = Math.min(x, Math.max(0, L.uiCols - w - 1));
+  // opaque background fill for the whole dropdown box (covers viewport/panel drawn earlier)
+  ctx.fillStyle = UI_BG;
+  ctx.fillRect(xAdj * state.uiCell, y * state.uiCell, w * state.uiCell, (items.length + 1) * state.uiCell);
+  drawBox(xAdj, y, w, items.length + 1, UI_DIM, 0.95);
+  let yy = y + 1;
+  for (const it of items) {
+    if (it.id === '---') {
+      for (let k = 1; k < w - 1; k++) uiChar('─', xAdj + k, yy, UI_LOW, 0.55);
+    } else {
+      addButton(it.id, xAdj + 1, yy, w - 2, 1);
+      // highlight hovered item
+      const hovered = state.pointer.row === yy && state.pointer.col >= xAdj + 1 && state.pointer.col < xAdj + w - 1;
+      if (hovered) {
+        ctx.fillStyle = UI_LOW;
+        ctx.fillRect((xAdj + 1) * state.uiCell, yy * state.uiCell, (w - 2) * state.uiCell, state.uiCell);
       }
-      const maxLabel = Math.max(...items.map(i => i.id === '---' ? 0 : i.label.length));
-      const maxKey = Math.max(...items.map(i => i.id === '---' ? 0 : (i.key || '').length));
-      const w = maxLabel + maxKey + 4;
-      let y = 1;
-      // background fill
-      ctx.fillStyle = UI_BG;
-      ctx.fillRect(x * state.uiCell, y * state.uiCell, w * state.uiCell, items.length * state.uiCell);
-      drawBox(x, y, w, items.length + 1, UI_DIM, 0.85);
-      let yy = y + 1;
-      for (const it of items) {
-        if (it.id === '---') {
-          for (let k = 1; k < w - 1; k++) uiChar('─', x + k, yy, UI_LOW, 0.55);
-        } else {
-          addButton(it.id, x + 1, yy, w - 2, 1);
-          uiText(it.label, x + 2, yy, UI_INK, 0.9);
-          if (it.key) uiText(it.key, x + w - 2 - it.key.length, yy, UI_DIM, 0.7);
-        }
-        yy++;
-      }
+      uiText(it.label, xAdj + 2, yy, hovered ? UI_HI : UI_INK, hovered ? 1 : 0.9);
+      if (it.key) uiText(it.key, xAdj + w - 2 - it.key.length, yy, UI_DIM, 0.75);
     }
+    yy++;
   }
 }
 
@@ -591,11 +599,13 @@ function drawCursor() {
 export function drawUI() {
   buttons = [];
   const L = layout();
-  drawMenus(L);
+  drawMenuBar(L);
   drawViewport(L);
   drawPanel(L);
   drawTimeline(L);
   drawStatus(L);
+  // Dropdown goes LAST so it sits on top of the viewport/panel/timeline.
+  drawMenuDropdown(L);
   drawCursor();
   return L;
 }
