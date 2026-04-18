@@ -27,7 +27,10 @@ function renderFrameToCanvas(frame, cellPx, target) {
   const cv = target || document.createElement('canvas');
   cv.width = cols * cellPx;
   cv.height = rows * cellPx * 2;           // chars are ~2x tall as wide
-  const ctx = cv.getContext('2d');
+  // Opaque context: VideoFrame's encoder pipeline treats alpha ambiguously
+  // (premultiplied vs straight) and inverts channels on some drivers. Force
+  // no alpha so RGB lands as-authored.
+  const ctx = cv.getContext('2d', { alpha: false });
   const h = cv.height / rows;
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, cv.width, cv.height);
@@ -441,8 +444,18 @@ async function exportVideoMSTG(cv, cellPx, fps) {
 
   const writer = gen.writable.getWriter();
   const frameDurUs = 1_000_000 / fps;
+  const frameDurMs = 1000 / fps;
+  // MediaRecorder ignores VideoFrame.timestamp and stamps arrivals with wall-clock time,
+  // so if we write as fast as rendering allows, the output plays back at however fast we
+  // managed to write (the 32fps bug). Pace writes to the requested fps instead.
+  const startT = performance.now();
   for (let i = 0; i < state.frames.length; i++) {
     renderFrameToCanvas(state.frames[i], cellPx, cv);
+    const expectedMs = i * frameDurMs;
+    const elapsedMs = performance.now() - startT;
+    if (elapsedMs < expectedMs) {
+      await new Promise(r => setTimeout(r, expectedMs - elapsedMs));
+    }
     const vf = new VideoFrame(cv, {
       timestamp: Math.round(i * frameDurUs),
       duration: Math.round(frameDurUs),
@@ -450,7 +463,6 @@ async function exportVideoMSTG(cv, cellPx, fps) {
     try { await writer.write(vf); }
     catch (e) { try { vf.close(); } catch (_) {} setStatus('encode failed: ' + (e.message || e)); break; }
     setStatus('encoding ' + (i + 1) + '/' + state.frames.length + ' @ ' + fps + 'fps');
-    if ((i & 7) === 0) await new Promise(r => setTimeout(r, 0));
   }
   try { await writer.close(); } catch (_) {}
   rec.stop();
