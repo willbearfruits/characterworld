@@ -1,0 +1,21 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: #030403; color: #eeeeee;
+  font-family: "Courier New", Courier, monospace;
+}
+body { cursor: none; }
+#cv { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
+.hidden { display: none; }
+.io-overlay {
+  position: fixed; inset: 0;
+  background: rgba(3, 4, 3, 0.92);
+  color: #d8d8d8;
+  padding: 40px;
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  z-index: 100;
+}
+.io-overlay.hidden { display: none; }

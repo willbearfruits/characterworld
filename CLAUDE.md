@@ -9,8 +9,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Current children:
 
 - `charactershop/` — the flagship. Photoshop-style character-only paint program. Single HTML file. See `charactershop/CLAUDE.md` for its architecture.
+- `characterfilm/` — character-only video editor (webcam → glyphs, record, scrub, export GIF/PNG/ANSI/MP4). ES modules. See `characterfilm/CLAUDE.md`.
+- `charactergrain/` — character-only generative granular synth (mycelium scheduler, keyboard + Xbox gamepad). ES modules. See `charactergrain/CLAUDE.md`.
 
-Future children will be added as sibling directories (e.g. `characterfield/`, `charactertype/`, etc.). Each child is a self-contained single-file project; they share policy but not code.
+Future children will be added as sibling directories. Each child is self-contained (single file OR a small ES-module tree); they share policy but not code.
 
 ## Project Law (applies to every child and the root)
 
@@ -35,6 +37,16 @@ characterworld/
 │  ├─ README.md
 │  ├─ LICENSE
 │  ├─ og.png, og-small.png, hero.png
+├─ characterfilm/          character-only video editor (ES modules)
+│  ├─ index.html
+│  ├─ CLAUDE.md
+│  ├─ README.md
+│  ├─ css/, js/
+├─ charactergrain/         character-only generative granular synth (ES modules)
+│  ├─ index.html
+│  ├─ CLAUDE.md
+│  ├─ README.md
+│  ├─ css/, js/
 ```
 
 The root `index.html` is a live, character-only directory page — it must itself obey project law (no images/SVG/path geometry in its rendering).

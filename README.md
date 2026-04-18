@@ -12,6 +12,7 @@
 |---|---|---|---|
 | 01 | [`charactershop`](charactershop/) — Photoshop-style character-only paint program | beta | [open](https://willbearfruits.github.io/characterworld/charactershop/) |
 | 02 | [`characterfilm`](characterfilm/) — character-only video editor (webcam → glyphs, record, scrub, export GIF/PNG/ANSI/MP4) | beta | [open](https://willbearfruits.github.io/characterworld/characterfilm/) |
+| 03 | [`charactergrain`](charactergrain/) — character-only generative granular synth (mycelium scheduler, keyboard + gamepad) | beta | [open](https://willbearfruits.github.io/characterworld/charactergrain/) |
 
 More coming. Each project is self-contained; `charactershop/` is a single HTML file, `characterfilm/` is a small set of ES modules. No frameworks, no bundlers.
 
