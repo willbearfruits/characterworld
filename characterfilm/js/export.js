@@ -304,6 +304,7 @@ function lzwEncode(indices, minCodeSize) {
         dict.clear();
         for (let k = 0; k < clear; k++) dict.set(String.fromCharCode(k), k);
       }
+      s = c;
     }
   }
   emit(dict.get(s));

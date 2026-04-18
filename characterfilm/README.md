@@ -1,6 +1,8 @@
 # characterfilm
 
-**Character-only video editor.** Webcam or video → typed glyphs in real time. Record, scrub, paint over frames, export GIF / PNG / ANSI / JSON.
+**Status: beta.** Feature-complete through v2 (onion skin, range ops, truecolor, MP4/WebM export) — rough edges likely, feedback welcome.
+
+**Character-only video editor.** Webcam or video → typed glyphs in real time. Record, scrub, paint over frames, export GIF / PNG / ANSI / MP4 / WebM / JSON.
 
 Part of [`characterworld`](../). Same philosophy as [`charactershop`](../charactershop/): every visible form is a typed character — the filmstrip, the playhead, the cursor, the UI, all of it.
 
@@ -12,14 +14,16 @@ Part of [`characterworld`](../). Same philosophy as [`charactershop`](../charact
 
 - **Source**: webcam (browser `getUserMedia`), video file, or still image
 - **Live converter**: every frame of the source is sampled into a character grid using a chosen density ramp; you control brightness, contrast, gamma, threshold, edge-detect strength, invert, ramp, theme, color mode
+- **Color modes**: MONO · QUANTIZED (palette-match) · EDGE (edges in highlight, body in ink) · TRUE (24-bit truecolor sampled per cell from source)
 - **Recording**: press `R` to capture incoming frames into a clip at your chosen FPS. Cap: 600 frames (~50s at 12fps)
+- **Import video as clip**: bake every frame of an external video into the timeline at the chosen fps
 - **Timeline**: scrub the character-based filmstrip, step frame-by-frame, duplicate, delete, clear
+- **Range ops**: shift-click to extend selection, `Ctrl+A`/`Ctrl+D` select-all/none, delete / duplicate / reverse range, shift frame left/right
+- **Onion skin**: ghost prev/next frames tinted cool/warm while editing (toggle with `O`, adjust range with `,`/`.`)
 - **Per-frame painting**: brush / pencil / erase / fill / eyedrop — same tool pattern as the atelier
 - **Undo / redo**: 64-deep snapshot-based history
 - **Save / load**: JSON project (`.cwf.json`) for round-tripping, localStorage for quick save
-- **Export**: animated GIF (LZW, shows motion), PNG (current frame), TXT, truecolor ANSI, JSON
-
-Onion skin is planned, not yet shipped.
+- **Export**: animated GIF (LZW, shows motion), MP4 / WebM video (MediaStreamTrackGenerator where available, canvas.captureStream fallback), PNG (current frame), TXT, truecolor ANSI, JSON
 
 ---
 
@@ -39,7 +43,14 @@ Onion skin is planned, not yet shipped.
 | `Ctrl+S` / `Ctrl+O` | Save project JSON / open project JSON |
 | `Ctrl+Shift+S` / `Ctrl+Shift+O` | Quick save / load (localStorage) |
 | `Ctrl+J` | Duplicate current frame |
+| `Ctrl+Shift+J` | Duplicate selected range |
 | `Delete` | Delete current frame |
+| `Shift+Del` | Delete selected range |
+| `O` | Toggle onion skin |
+| `,` `.` | Onion range − / + |
+| `Shift+←` `Shift+→` | Extend selection |
+| `Alt+←` `Alt+→` | Shift current frame left / right |
+| `Ctrl+A` `Ctrl+D` | Select all / none |
 | `Esc` | Close menus / dialogs |
 
 ---

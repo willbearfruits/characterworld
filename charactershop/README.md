@@ -1,5 +1,7 @@
 # characterworld / atelier
 
+**Status: beta.** Feature-complete, rough edges likely — feedback welcome.
+
 **Character-only Photoshop-style paint & composite program. Single HTML file. Zero dependencies.**
 
 Every visible form — the painting, the cursor, the UI, the borders, the selection marching ants, the minimap — is built from typed glyphs. No images, no SVG illustrations, no vector shapes. The medium *is* characters.
