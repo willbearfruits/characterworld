@@ -1,5 +1,5 @@
 import { state, setStatus } from './state.js';
-import { RAMPS, RAMP_NAMES, THEMES, THEME_NAMES, SRC_NONE, SRC_WEBCAM, SRC_VIDEO, SRC_IMAGE, MAX_FRAMES } from './constants.js';
+import { RAMPS, RAMP_NAMES, THEMES, THEME_NAMES, SRC_NONE, SRC_WEBCAM, SRC_VIDEO, SRC_IMAGE, MAX_FRAMES, RGB_SENTINEL } from './constants.js';
 import { pushHistory } from './history.js';
 
 const srcVideo = document.getElementById('src');
@@ -138,6 +138,7 @@ export async function bakeVideoToFrames(file, opts = {}) {
       chars: state.live.chars.slice(),
       colors: new Uint8Array(state.live.colors),
       marks: new Uint8Array(state.live.marks),
+      rgb: state.live.rgb ? new Uint8Array(state.live.rgb) : null,
     });
     if ((i & 3) === 0) {
       setStatus('importing ' + (i + 1) + '/' + total + '…');
@@ -168,12 +169,17 @@ export async function loadImageFile(file) {
 }
 
 // Ensure live.chars/colors/marks arrays match cols*rows.
+// rgb is allocated lazily (only when TRUE color mode is active).
 export function ensureLiveBuffers() {
   const n = state.cols * state.rows;
   if (!state.live.chars || state.live.chars.length !== n) {
     state.live.chars = new Array(n).fill(' ');
     state.live.colors = new Uint8Array(n);
     state.live.marks = new Uint8Array(n);
+    state.live.rgb = null;
+  }
+  if (state.knobs.colorMode === 3 && (!state.live.rgb || state.live.rgb.length !== n * 3)) {
+    state.live.rgb = new Uint8Array(n * 3);
   }
 }
 
@@ -294,6 +300,13 @@ function convertPixelsToChars(data, sw, sh) {
     }
   }
 
+  // In TRUE color mode we also record per-cell RGB sampled from the source.
+  const wantRgb = colorMode === 3;
+  if (wantRgb && (!live.rgb || live.rgb.length !== n * 3)) {
+    live.rgb = new Uint8Array(n * 3);
+  }
+  const rgb = wantRgb ? live.rgb : null;
+
   for (let i = 0; i < n; i++) {
     let v = gray[i];
     if (edges) v = Math.min(1, v + edges[i] * edgeStrength);
@@ -302,6 +315,7 @@ function convertPixelsToChars(data, sw, sh) {
       live.chars[i] = ' ';
       live.colors[i] = 0;
       live.marks[i] = 0;
+      if (rgb) { rgb[i * 3] = 0; rgb[i * 3 + 1] = 0; rgb[i * 3 + 2] = 0; }
       continue;
     }
 
@@ -323,6 +337,15 @@ function convertPixelsToChars(data, sw, sh) {
       // EDGE — edges get highlight, body gets ink.
       if (edges && edges[i] > 0.5) colIdx = 2;  // HI
       else colIdx = inkIdx;
+    } else if (colorMode === 3) {
+      // TRUE — mark the cell as "read from rgb buffer" and store the sampled RGB.
+      const p = i * 4;
+      // modulate by density so the character glyph carries visible color weight
+      const mod = 0.55 + 0.45 * v;
+      rgb[i * 3]     = Math.min(255, Math.round(data[p]     * mod));
+      rgb[i * 3 + 1] = Math.min(255, Math.round(data[p + 1] * mod));
+      rgb[i * 3 + 2] = Math.min(255, Math.round(data[p + 2] * mod));
+      colIdx = RGB_SENTINEL;
     }
     live.colors[i] = colIdx;
     live.marks[i] = 0;

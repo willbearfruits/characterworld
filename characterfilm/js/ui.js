@@ -124,6 +124,7 @@ const MENUS = {
     { id: '---' },
     { id: 'file:png',    label: 'Export PNG',      key: '' },
     { id: 'file:gif',    label: 'Export GIF',      key: '' },
+    { id: 'file:mp4',    label: 'Export video (mp4/webm)', key: '' },
     { id: 'file:txt',    label: 'Export TXT',      key: '' },
     { id: 'file:ansi',   label: 'Export ANSI',     key: '' },
     { id: 'file:json',   label: 'Export JSON',     key: '' },
@@ -327,10 +328,11 @@ function drawPanelKnobs(px, py, pw) {
     if (isActive) uiChar('▾', px + 1 + i, y - 0.001, UI_HI, 0);
   }
   y++;
-  // Color mode toggle
+  // Color mode toggle — compact 5-char labels so all 4 fit in the 32-col panel.
   uiText('COLOR', px + 1, y, UI_MID, 0.85);
+  const cmShort = { MONO: 'MONO', QUANTIZED: 'QUANT', EDGE: 'EDGE', TRUE: 'TRUE' };
   COLOR_MODES.forEach((m, i) => {
-    drawButton('k:cmode:' + i, m, px + 7 + i * 10, y, 9, k.colorMode === i);
+    drawButton('k:cmode:' + i, cmShort[m] || m, px + 7 + i * 6, y, 5, k.colorMode === i);
   });
   y += 2;
   return y;
@@ -524,12 +526,19 @@ function drawViewport(L) {
     ctx.globalAlpha = 1;
   }
 
+  const hasRgb = !!frame.rgb;
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const i = y * cols + x;
       const ch = frame.chars[i];
       if (ch && ch !== ' ') {
-        ctx.fillStyle = hexOfPalette(frame.colors[i] || 1);
+        const c = frame.colors[i];
+        if (hasRgb && c === 255) {
+          const p = i * 3;
+          ctx.fillStyle = `rgb(${frame.rgb[p]},${frame.rgb[p + 1]},${frame.rgb[p + 2]})`;
+        } else {
+          ctx.fillStyle = hexOfPalette(c || 1);
+        }
         ctx.fillText(ch, ox + x * cellW + cellW / 2, oy + y * cellH + 1);
       }
     }
@@ -722,6 +731,7 @@ function dispatch(id) {
   if (id === 'file:stop')   { close(); vid.stopSource(); return true; }
   if (id === 'file:png')    { close(); ex.exportPng(); return true; }
   if (id === 'file:gif')    { close(); ex.exportGif(); return true; }
+  if (id === 'file:mp4')    { close(); ex.exportVideo(); return true; }
   if (id === 'file:txt')    { close(); ex.exportTxt(); return true; }
   if (id === 'file:ansi')   { close(); ex.exportAnsi(); return true; }
   if (id === 'file:json')   { close(); ex.exportJson(); return true; }

@@ -7,13 +7,24 @@ import { pushHistory } from './history.js';
 
 const STORAGE_KEY = 'characterfilm_project_v1';
 
+// Convert a per-cell color (palette idx or truecolor sentinel) to a fill style.
+function cellFill(frame, i) {
+  const c = frame.colors[i];
+  if (c === 255 && frame.rgb) {
+    const p = i * 3;
+    return `rgb(${frame.rgb[p]},${frame.rgb[p + 1]},${frame.rgb[p + 2]})`;
+  }
+  return hexOfPalette(c || 1);
+}
+
 // -------- Render helpers: draw a frame (chars+colors) to an offscreen canvas. --------
-function renderFrameToCanvas(frame, cellPx) {
+// If a target canvas is provided, we draw into it (sized to match). Otherwise a new canvas is returned.
+function renderFrameToCanvas(frame, cellPx, target) {
   const { cols, rows, knobs } = state;
   const theme = THEMES[THEME_NAMES[knobs.themeIdx]];
   const bg = theme[0][1];
 
-  const cv = document.createElement('canvas');
+  const cv = target || document.createElement('canvas');
   cv.width = cols * cellPx;
   cv.height = rows * cellPx * 2;           // chars are ~2x tall as wide
   const ctx = cv.getContext('2d');
@@ -28,7 +39,7 @@ function renderFrameToCanvas(frame, cellPx) {
       const i = y * cols + x;
       const ch = frame.chars[i];
       if (ch === ' ' || !ch) continue;
-      ctx.fillStyle = hexOfPalette(frame.colors[i] || 1);
+      ctx.fillStyle = cellFill(frame, i);
       ctx.fillText(ch, x * cellPx + cellPx / 2, y * h + 1);
     }
   }
@@ -77,11 +88,18 @@ export function exportAnsi() {
       const i = y * cols + x;
       const ch = frame.chars[i] || ' ';
       const c = frame.colors[i] || 1;
-      if (c !== prevCol) {
-        const hex = theme[c][1];
-        const r = parseInt(hex.slice(1, 3), 16);
-        const g = parseInt(hex.slice(3, 5), 16);
-        const b = parseInt(hex.slice(5, 7), 16);
+      let r, g, b;
+      if (c === 255 && frame.rgb) {
+        const p = i * 3;
+        r = frame.rgb[p]; g = frame.rgb[p + 1]; b = frame.rgb[p + 2];
+      } else {
+        const hex = theme[Math.min(c, theme.length - 1)][1];
+        r = parseInt(hex.slice(1, 3), 16);
+        g = parseInt(hex.slice(3, 5), 16);
+        b = parseInt(hex.slice(5, 7), 16);
+      }
+      // Each ANSI color sequence flushed per-cell when truecolor; cheap enough for character grids.
+      if (c !== prevCol || c === 255) {
         out += `\x1b[38;2;${r};${g};${b}m`;
         prevCol = c;
       }
@@ -103,11 +121,15 @@ export function exportJson() {
     rows: state.rows,
     fps: state.fps,
     knobs: state.knobs,
-    frames: state.frames.map(f => ({
-      chars: f.chars.join(''),
-      colors: Array.from(f.colors),
-      marks: Array.from(f.marks),
-    })),
+    frames: state.frames.map(f => {
+      const o = {
+        chars: f.chars.join(''),
+        colors: Array.from(f.colors),
+        marks: Array.from(f.marks),
+      };
+      if (f.rgb) o.rgb = Array.from(f.rgb);
+      return o;
+    }),
   };
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
   triggerDownload(blob, 'characterfilm-project.cwf.json');
@@ -132,6 +154,7 @@ export async function importJsonFile(file) {
       chars: (f.chars || '').split('').slice(0, n).concat(new Array(Math.max(0, n - (f.chars || '').length)).fill(' ')),
       colors: new Uint8Array(f.colors || new Array(n).fill(0)),
       marks: new Uint8Array(f.marks || new Array(n).fill(0)),
+      rgb: f.rgb ? new Uint8Array(f.rgb) : null,
     }));
     state.current = state.frames.length ? 0 : -1;
     state.viewMode = state.frames.length ? 'frame' : 'live';
@@ -148,11 +171,15 @@ export function quickSave() {
     const data = {
       format: 'characterfilm/project', version: 1,
       cols: state.cols, rows: state.rows, fps: state.fps, knobs: state.knobs,
-      frames: state.frames.map(f => ({
-        chars: f.chars.join(''),
-        colors: Array.from(f.colors),
-        marks: Array.from(f.marks),
-      })),
+      frames: state.frames.map(f => {
+        const o = {
+          chars: f.chars.join(''),
+          colors: Array.from(f.colors),
+          marks: Array.from(f.marks),
+        };
+        if (f.rgb) o.rgb = Array.from(f.rgb);
+        return o;
+      }),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     setStatus('quick saved (' + state.frames.length + ' frames)');
@@ -171,6 +198,7 @@ export function quickLoad() {
       chars: (f.chars || '').split('').slice(0, n).concat(new Array(Math.max(0, n - (f.chars || '').length)).fill(' ')),
       colors: new Uint8Array(f.colors || new Array(n).fill(0)),
       marks: new Uint8Array(f.marks || new Array(n).fill(0)),
+      rgb: f.rgb ? new Uint8Array(f.rgb) : null,
     }));
     state.current = state.frames.length ? 0 : -1;
     state.viewMode = state.frames.length ? 'frame' : 'live';
@@ -317,7 +345,7 @@ function rasterizeFrame(frame, cellW, cellH, gifBits) {
       const i = y * cols + x;
       const ch = frame.chars[i];
       if (!ch || ch === ' ') continue;
-      ctx.fillStyle = hexOfPalette(frame.colors[i] || 1);
+      ctx.fillStyle = cellFill(frame, i);
       ctx.fillText(ch, x * cellW + cellW / 2, y * cellH + 1);
     }
   }
@@ -360,6 +388,83 @@ export async function exportGif() {
   const blob = new Blob([writer.finish()], { type: 'image/gif' });
   triggerDownload(blob, 'characterfilm.gif');
   setStatus('gif exported (' + state.frames.length + ' frames)');
+}
+
+// -------- Video (MediaRecorder on an offscreen canvas) --------
+// Picks the best-supported mime. Chromium generally exports webm/vp9; Safari does mp4/h264.
+function pickVideoMime() {
+  const candidates = [
+    'video/mp4;codecs=avc1.42E01E',
+    'video/mp4',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm;codecs=h264',
+    'video/webm',
+  ];
+  if (typeof MediaRecorder === 'undefined') return { mime: '', ext: 'webm' };
+  for (const m of candidates) {
+    try { if (MediaRecorder.isTypeSupported(m)) return { mime: m, ext: m.includes('mp4') ? 'mp4' : 'webm' }; }
+    catch (e) { /* keep trying */ }
+  }
+  return { mime: '', ext: 'webm' };
+}
+
+export async function exportVideo() {
+  if (typeof MediaRecorder === 'undefined' || !HTMLCanvasElement.prototype.captureStream) {
+    setStatus('video export not supported in this browser');
+    return;
+  }
+  if (!state.frames.length) { setStatus('record some frames first'); return; }
+
+  const fps = Math.max(1, Math.min(60, state.fps));
+  // Pick a cell size that keeps the output clip roughly 1080p-ish at most.
+  const { cols, rows } = state;
+  const targetMax = 1920;
+  const maxByCol = Math.floor(targetMax / cols);
+  const cellPx = Math.max(6, Math.min(18, maxByCol || 12));
+
+  // Build an offscreen canvas sized to full grid at cellPx per cell.
+  const cv = document.createElement('canvas');
+  // renderFrameToCanvas will set cv.width/height; we just need it ready.
+  renderFrameToCanvas(state.frames[0], cellPx, cv);
+
+  const { mime, ext } = pickVideoMime();
+  let stream;
+  try { stream = cv.captureStream(fps); }
+  catch (e) { setStatus('captureStream failed'); return; }
+
+  const opts = mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : {};
+  let rec;
+  try { rec = new MediaRecorder(stream, opts); }
+  catch (e) {
+    try { rec = new MediaRecorder(stream); }
+    catch (e2) { setStatus('MediaRecorder init failed'); return; }
+  }
+
+  const chunks = [];
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  const stopped = new Promise(res => { rec.onstop = res; });
+
+  rec.start();
+
+  const interval = 1000 / fps;
+  const track = stream.getVideoTracks && stream.getVideoTracks()[0];
+  for (let i = 0; i < state.frames.length; i++) {
+    renderFrameToCanvas(state.frames[i], cellPx, cv);
+    if (track && track.requestFrame) track.requestFrame();
+    setStatus('encoding video ' + (i + 1) + '/' + state.frames.length);
+    await new Promise(r => setTimeout(r, interval));
+  }
+  // Hold the last frame for one full interval so encoders don't truncate it.
+  await new Promise(r => setTimeout(r, interval));
+
+  rec.stop();
+  await stopped;
+  if (track && track.stop) track.stop();
+
+  const blob = new Blob(chunks, { type: mime || 'video/webm' });
+  triggerDownload(blob, 'characterfilm.' + ext);
+  setStatus('video exported (' + ext + ', ' + state.frames.length + ' frames @ ' + fps + 'fps)');
 }
 
 function triggerDownload(blob, name) {

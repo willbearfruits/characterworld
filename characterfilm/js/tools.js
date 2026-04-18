@@ -27,6 +27,10 @@ export function paintCell(x, y, ch, col, isErase) {
     f.chars[i] = ch;
     f.colors[i] = col;
   }
+  // Painted cells use the palette — clear any truecolor sentinel bytes.
+  if (f.rgb) {
+    f.rgb[i * 3] = 0; f.rgb[i * 3 + 1] = 0; f.rgb[i * 3 + 2] = 0;
+  }
 }
 
 export function applyBrushAt(x, y) {
@@ -69,6 +73,7 @@ export function floodFillAt(x, y) {
     if (f.chars[i] !== tgtCh || f.colors[i] !== tgtCol) continue;
     f.chars[i] = newCh;
     f.colors[i] = newCol;
+    if (f.rgb) { f.rgb[i * 3] = 0; f.rgb[i * 3 + 1] = 0; f.rgb[i * 3 + 2] = 0; }
     stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
   }
 }
@@ -80,7 +85,9 @@ export function eyedropAt(x, y) {
   const i = idx(x, y);
   if (f.chars[i] !== ' ') {
     state.brushGlyph = f.chars[i];
-    state.brushColor = f.colors[i] || 1;
+    const c = f.colors[i];
+    // Truecolor cells fall back to INK (palette index 1) for the brush color.
+    state.brushColor = c === 255 ? 1 : (c || 1);
     setStatus('picked: ' + state.brushGlyph);
   }
 }

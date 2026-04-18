@@ -28,6 +28,7 @@ export function captureFromLive() {
     chars: state.live.chars.slice(),
     colors: new Uint8Array(state.live.colors),
     marks: new Uint8Array(state.live.marks),
+    rgb: state.live.rgb ? new Uint8Array(state.live.rgb) : null,
   };
   state.frames.push(frame);
   const idx = state.frames.length - 1;
@@ -128,6 +129,7 @@ export function duplicateCurrentFrame() {
     chars: src.chars.slice(),
     colors: new Uint8Array(src.colors),
     marks: new Uint8Array(src.marks),
+    rgb: src.rgb ? new Uint8Array(src.rgb) : null,
   };
   state.frames.splice(state.current + 1, 0, copy);
   state.current += 1;
@@ -202,6 +204,7 @@ export function duplicateRange() {
       chars: src.chars.slice(),
       colors: new Uint8Array(src.colors),
       marks: new Uint8Array(src.marks),
+      rgb: src.rgb ? new Uint8Array(src.rgb) : null,
     });
   }
   if (state.frames.length + copies.length > MAX_FRAMES) {

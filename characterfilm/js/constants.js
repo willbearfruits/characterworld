@@ -68,7 +68,11 @@ export const MODES = [
 ];
 export const MODE_KEY = Object.fromEntries(MODES.map(m => [m.key, m.id]));
 
-export const COLOR_MODES = ['MONO', 'QUANTIZED', 'EDGE'];
+export const COLOR_MODES = ['MONO', 'QUANTIZED', 'EDGE', 'TRUE'];
+
+// Sentinel palette index that means "read color from frame.rgb[i*3..i*3+2] instead of the theme palette".
+// Chosen as 255 because theme palettes are never longer than 16 entries in practice.
+export const RGB_SENTINEL = 255;
 
 // Glyph set for the brush picker (not the ramp — tools use this).
 export const GLYPH_PICKER = [

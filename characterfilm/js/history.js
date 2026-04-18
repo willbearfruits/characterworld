@@ -10,6 +10,7 @@ function cloneFrame(f) {
     chars: f.chars.slice(),
     colors: new Uint8Array(f.colors),
     marks: new Uint8Array(f.marks),
+    rgb: f.rgb ? new Uint8Array(f.rgb) : null,
   };
 }
 

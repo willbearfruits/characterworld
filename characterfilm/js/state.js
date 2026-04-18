@@ -37,6 +37,7 @@ export const state = {
     chars: null,
     colors: null,
     marks: null,
+    rgb: null,     // Uint8Array(n*3) when TRUE color mode is active; null otherwise
     dirty: true,
   },
 
