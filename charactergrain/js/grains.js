@@ -289,28 +289,49 @@ export function tickCanvas(dt) {
   ensureSharedGrid();
   if (!state.canvas || state.canvas.painted.length !== state.cols * state.rows) initCanvas();
   const heatDecay = Math.exp(-dt * 2.5);
-  const { accum } = state.canvas;
+  const { accum, painted } = state.canvas;
   for (let i = 0; i < state.heat.length; i++) {
     state.heat[i] *= heatDecay;
     if (accum[i] > 0) accum[i] = Math.max(0, accum[i] - dt);
   }
-  // Density knob drives a gentle ambient: occasionally re-fire a painted cell
-  // without mouse input, so the canvas breathes by itself at high density.
   const dens = state.knobs.density;
-  const ambientHz = dens * 8;
-  if (ambientHz > 0 && state.canvas.painted.length > 0) {
-    const expect = ambientHz * dt;
-    if (Math.random() < expect) {
-      const { painted } = state.canvas;
+  const seq = state.canvasSeq;
+
+  // Sequencer: step through painted cells in grid order at density-driven rate.
+  if (seq && seq.on && painted.length > 0) {
+    const rate = Math.max(1, dens * 40 * (seq.rateMul || 1));   // steps/sec
+    seq.accum += dt * rate;
+    let steps = 0;
+    while (seq.accum >= 1 && steps < 32) {
+      seq.accum -= 1; steps++;
       const N = painted.length;
-      const start = (Math.random() * N) | 0;
+      let found = -1;
       for (let k = 0; k < N; k++) {
-        const i = (start + k) % N;
-        if (painted[i]) {
-          const x = i % state.cols, y = (i / state.cols) | 0;
-          fireFromCell(x, y, painted[i] - 1, 0.25);
-          state.heat[i] = Math.min(1, state.heat[i] + 0.3);
-          break;
+        const i = (seq.pos + k) % N;
+        if (painted[i]) { found = i; break; }
+      }
+      if (found < 0) break;   // nothing painted
+      const x = found % state.cols, y = (found / state.cols) | 0;
+      fireFromCell(x, y, painted[found] - 1, 0.45);
+      state.heat[found] = Math.min(1, state.heat[found] + 0.5);
+      seq.pos = (found + 1) % N;
+    }
+  } else {
+    // Ambient breathing when sequencer is off — density retriggers random painted cells.
+    const ambientHz = dens * 8;
+    if (ambientHz > 0 && painted.length > 0) {
+      const expect = ambientHz * dt;
+      if (Math.random() < expect) {
+        const N = painted.length;
+        const start = (Math.random() * N) | 0;
+        for (let k = 0; k < N; k++) {
+          const i = (start + k) % N;
+          if (painted[i]) {
+            const x = i % state.cols, y = (i / state.cols) | 0;
+            fireFromCell(x, y, painted[i] - 1, 0.25);
+            state.heat[i] = Math.min(1, state.heat[i] + 0.3);
+            break;
+          }
         }
       }
     }

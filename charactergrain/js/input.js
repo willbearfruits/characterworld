@@ -343,6 +343,22 @@ function dispatch(id, e) {
   if (id.startsWith('paint:glyph:')){ state.paint.glyphIdx = parseInt(id.slice('paint:glyph:'.length), 10); return; }
   if (id === 'paint:zalgo')         { state.paint.zalgo = !state.paint.zalgo; return; }
 
+  // Canvas sequencer.
+  if (id === 'canvas:seqToggle') {
+    state.canvasSeq.on = !state.canvasSeq.on;
+    state.canvasSeq.accum = 0;
+    setStatus(state.canvasSeq.on ? 'canvas sequencer ▶' : 'canvas sequencer off');
+    return;
+  }
+  if (id === 'canvas:seqSlower') {
+    state.canvasSeq.rateMul = Math.max(0.1, (state.canvasSeq.rateMul || 1) / 1.25);
+    return;
+  }
+  if (id === 'canvas:seqFaster') {
+    state.canvasSeq.rateMul = Math.min(8, (state.canvasSeq.rateMul || 1) * 1.25);
+    return;
+  }
+
   // Snippet recall.
   if (id.startsWith('snip:')) {
     const i = parseInt(id.slice(5), 10);

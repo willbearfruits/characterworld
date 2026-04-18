@@ -596,6 +596,20 @@ function drawPaintPanel(pc, row, pw) {
   row++;
   drawBtn('algo:canvasRand', 'randomize', pc + 1, row++, pw - 2, false, color('INK'));
   drawBtn('algo:canvasClear', 'clear canvas', pc + 1, row++, pw - 2, false, color('WARN'));
+  // Sequencer — plays painted grains in grid order.
+  const seqOn = state.canvasSeq && state.canvasSeq.on;
+  drawBtn('canvas:seqToggle', seqOn ? 'SEQ ▶ playing' : 'SEQ  off', pc + 1, row++, pw - 2, seqOn);
+  if (seqOn) {
+    putStr('speed:', pc + 1, row, color('UI'));
+    addBtn('canvas:seqSlower', pc + 8, row, 3, 1);
+    putStr('[-]', pc + 8, row, color('DIM'));
+    const mul = state.canvasSeq.rateMul || 1;
+    const lbl = mul >= 1 ? mul.toFixed(1) + 'x' : mul.toFixed(2) + 'x';
+    putStr(lbl, pc + 12, row, color('SUN'));
+    addBtn('canvas:seqFaster', pc + pw - 4, row, 3, 1);
+    putStr('[+]', pc + pw - 4, row, color('DIM'));
+    row++;
+  }
   putStr('drag: paint · shift: erase', pc + 1, row++, color('DIM'));
   row++;
   return row;

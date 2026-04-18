@@ -68,6 +68,10 @@ export const state = {
   // Paint-tool state for CANVAS algo.
   paint: { tier: 'warm', glyphIdx: -1, zalgo: false },
 
+  // CANVAS sequencer — when on, painted cells fire in grid order at a rate
+  // derived from density * rateMul. Independent of hover firing.
+  canvasSeq: { on: false, pos: 0, accum: 0, rateMul: 1 },
+
   // Last N grains for the info strip (ring buffer).
   recent: [],
   recentMax: 24,

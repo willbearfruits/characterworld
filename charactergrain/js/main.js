@@ -1,6 +1,6 @@
 import { state, setStatus } from './state.js';
 import { initUI, resizeUI, drawUI } from './ui.js';
-import { resetForAlgo, tickScheduler, advanceScan } from './grains.js';
+import { resetForAlgo, tickScheduler, advanceScan, randomizeCanvas } from './grains.js';
 import { initInput, pollGamepad } from './input.js';
 import { audioNow, loadSampleURL } from './audio.js';
 
@@ -24,14 +24,18 @@ function resize() {
   if (state.compact && !state.compactApplied) {
     state.panelOpen = {
       sound: true, scan: true, play: true,
-      growth: false, fx: false, canvas: false, stormcell: false,
+      growth: false, fx: false, canvas: true, stormcell: false,
       algo: false, source: false, sample: false, prefs: false,
     };
-    // Boot straight into CANVAS algo so the first tap paints and sounds.
+    // Boot straight into CANVAS with a painted field + sequencer running.
+    // First tap unlocks audio (pointerdown → audioCtx resume) and you hear it.
     state.algo = 1;
     resetForAlgo();
+    randomizeCanvas();
+    state.canvasSeq.on = true;
+    state.canvasSeq.pos = 0;
     state.playing = true;
-    setStatus('tap anywhere to start · paint to sound');
+    setStatus('tap anywhere to unlock sound · drag to paint');
     state.compactApplied = true;
   }
 }
