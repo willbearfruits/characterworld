@@ -409,29 +409,22 @@ function pickVideoMime() {
   return { mime: '', ext: 'webm' };
 }
 
-export async function exportVideo() {
-  if (typeof MediaRecorder === 'undefined' || !HTMLCanvasElement.prototype.captureStream) {
-    setStatus('video export not supported in this browser');
-    return;
-  }
-  if (!state.frames.length) { setStatus('record some frames first'); return; }
-
-  const fps = Math.max(1, Math.min(60, state.fps));
-  // Pick a cell size that keeps the output clip roughly 1080p-ish at most.
-  const { cols, rows } = state;
+// Pick a per-cell pixel size for the output canvas. Aim for <= ~1920px on the long axis.
+function pickExportCellPx(cols) {
   const targetMax = 1920;
   const maxByCol = Math.floor(targetMax / cols);
-  const cellPx = Math.max(6, Math.min(18, maxByCol || 12));
+  return Math.max(6, Math.min(18, maxByCol || 12));
+}
 
-  // Build an offscreen canvas sized to full grid at cellPx per cell.
-  const cv = document.createElement('canvas');
-  // renderFrameToCanvas will set cv.width/height; we just need it ready.
-  renderFrameToCanvas(state.frames[0], cellPx, cv);
-
+// Primary export path (Chromium today): MediaStreamTrackGenerator + VideoFrame.
+// Timestamps are author-controlled, so the output file's fps matches the requested fps
+// regardless of how long each render takes. Canvas.captureStream can't do this — it
+// ties the stream's framerate to the canvas mutation rate, which produces the 8.97fps
+// garbage file when rendering is slower than the requested interval.
+async function exportVideoMSTG(cv, cellPx, fps) {
   const { mime, ext } = pickVideoMime();
-  let stream;
-  try { stream = cv.captureStream(fps); }
-  catch (e) { setStatus('captureStream failed'); return; }
+  const gen = new MediaStreamTrackGenerator({ kind: 'video' });
+  const stream = new MediaStream([gen]);
 
   const opts = mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : {};
   let rec;
@@ -444,27 +437,95 @@ export async function exportVideo() {
   const chunks = [];
   rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
   const stopped = new Promise(res => { rec.onstop = res; });
+  rec.start();
 
+  const writer = gen.writable.getWriter();
+  const frameDurUs = 1_000_000 / fps;
+  for (let i = 0; i < state.frames.length; i++) {
+    renderFrameToCanvas(state.frames[i], cellPx, cv);
+    const vf = new VideoFrame(cv, {
+      timestamp: Math.round(i * frameDurUs),
+      duration: Math.round(frameDurUs),
+    });
+    try { await writer.write(vf); }
+    catch (e) { try { vf.close(); } catch (_) {} setStatus('encode failed: ' + (e.message || e)); break; }
+    setStatus('encoding ' + (i + 1) + '/' + state.frames.length + ' @ ' + fps + 'fps');
+    if ((i & 7) === 0) await new Promise(r => setTimeout(r, 0));
+  }
+  try { await writer.close(); } catch (_) {}
+  rec.stop();
+  await stopped;
+
+  const blob = new Blob(chunks, { type: mime || 'video/webm' });
+  triggerDownload(blob, 'characterfilm.' + ext);
+  setStatus('video exported (' + ext + ', ' + state.frames.length + ' frames @ ' + fps + 'fps)');
+}
+
+// Fallback for browsers without MediaStreamTrackGenerator.
+// Wall-clock based: drives the canvas fast enough that captureStream actually samples at fps.
+// If rendering a frame genuinely takes longer than 1/fps, the output will still be slow —
+// there's no way around that without author-controlled timestamps.
+async function exportVideoCaptureStream(cv, cellPx, fps) {
+  const { mime, ext } = pickVideoMime();
+  let stream;
+  try { stream = cv.captureStream(fps); }
+  catch (e) { setStatus('captureStream failed'); return; }
+
+  const opts = mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : {};
+  let rec;
+  try { rec = new MediaRecorder(stream, opts); }
+  catch (e) {
+    try { rec = new MediaRecorder(stream); }
+    catch (e2) { setStatus('MediaRecorder init failed'); return; }
+  }
+  const chunks = [];
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  const stopped = new Promise(res => { rec.onstop = res; });
   rec.start();
 
   const interval = 1000 / fps;
   const track = stream.getVideoTracks && stream.getVideoTracks()[0];
+  let next = performance.now();
   for (let i = 0; i < state.frames.length; i++) {
+    // Wait until the next scheduled tick so the stream's fps target is actually met
+    // when rendering is faster than 1/fps. (No help when rendering is slower.)
+    const nowT = performance.now();
+    if (nowT < next) await new Promise(r => setTimeout(r, next - nowT));
     renderFrameToCanvas(state.frames[i], cellPx, cv);
     if (track && track.requestFrame) track.requestFrame();
-    setStatus('encoding video ' + (i + 1) + '/' + state.frames.length);
-    await new Promise(r => setTimeout(r, interval));
+    next += interval;
+    setStatus('encoding ' + (i + 1) + '/' + state.frames.length + ' @ ' + fps + 'fps');
   }
-  // Hold the last frame for one full interval so encoders don't truncate it.
   await new Promise(r => setTimeout(r, interval));
-
   rec.stop();
   await stopped;
   if (track && track.stop) track.stop();
 
   const blob = new Blob(chunks, { type: mime || 'video/webm' });
   triggerDownload(blob, 'characterfilm.' + ext);
-  setStatus('video exported (' + ext + ', ' + state.frames.length + ' frames @ ' + fps + 'fps)');
+  setStatus('video exported (' + ext + ', ' + state.frames.length + ' frames, target ' + fps + 'fps)');
+}
+
+export async function exportVideo() {
+  if (typeof MediaRecorder === 'undefined') {
+    setStatus('video export not supported in this browser');
+    return;
+  }
+  if (!state.frames.length) { setStatus('record some frames first'); return; }
+
+  const fps = Math.max(1, Math.min(60, state.fps));
+  const { cols } = state;
+  const cellPx = pickExportCellPx(cols);
+
+  const cv = document.createElement('canvas');
+  renderFrameToCanvas(state.frames[0], cellPx, cv);
+
+  const hasMSTG =
+    typeof MediaStreamTrackGenerator !== 'undefined' &&
+    typeof VideoFrame !== 'undefined';
+  if (hasMSTG) return exportVideoMSTG(cv, cellPx, fps);
+  if (HTMLCanvasElement.prototype.captureStream) return exportVideoCaptureStream(cv, cellPx, fps);
+  setStatus('video export not supported in this browser');
 }
 
 function triggerDownload(blob, name) {
