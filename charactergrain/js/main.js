@@ -27,6 +27,11 @@ function resize() {
       growth: false, fx: false, canvas: false, stormcell: false,
       algo: false, source: false, sample: false, prefs: false,
     };
+    // Boot straight into CANVAS algo so the first tap paints and sounds.
+    state.algo = 1;
+    resetForAlgo();
+    state.playing = true;
+    setStatus('tap anywhere to start · paint to sound');
     state.compactApplied = true;
   }
 }

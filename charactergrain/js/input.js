@@ -98,6 +98,9 @@ function initPointer() {
 
   cv.addEventListener('pointerdown', (e) => {
     updatePointer(e);
+    // Any tap is a valid user gesture — unlock/resume the AudioContext so
+    // mobile autoplay restrictions don't silence the auto-started session.
+    audioCtx();
     cv.setPointerCapture?.(e.pointerId);
     if (e.button === 0) state.mouse.leftDown = true;
     else if (e.button === 2) state.mouse.rightDown = true;
