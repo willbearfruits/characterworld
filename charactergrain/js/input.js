@@ -73,8 +73,15 @@ function updatePointer(e) {
 function initPointer() {
   const cv = document.getElementById('cv');
 
+  // Touch long-press simulates right-click so mycelium nutrient paint is
+  // reachable on phones. Desktop (fine pointer) path is unchanged.
+  let lpTimer = null;
+  let lpStartX = 0, lpStartY = 0;
+  const cancelLP = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
+
   cv.addEventListener('pointermove', (e) => {
     updatePointer(e);
+    if (lpTimer && (Math.abs(e.clientX - lpStartX) > 8 || Math.abs(e.clientY - lpStartY) > 8)) cancelLP();
     if (state.recorderOpen || state.menuOpen) return;
     if (state.mouse.leftDown && state.mouse.inField) {
       if (state.algo === 1) {
@@ -94,6 +101,17 @@ function initPointer() {
     cv.setPointerCapture?.(e.pointerId);
     if (e.button === 0) state.mouse.leftDown = true;
     else if (e.button === 2) state.mouse.rightDown = true;
+    if (e.pointerType === 'touch') {
+      lpStartX = e.clientX; lpStartY = e.clientY;
+      cancelLP();
+      lpTimer = setTimeout(() => {
+        lpTimer = null;
+        state.mouse.rightDown = true;
+        if (state.mouse.inField && state.algo === 0) {
+          paintNutrientAt(state.mouse.fx, state.mouse.fy, 0.45);
+        }
+      }, 450);
+    }
 
     // UI buttons first.
     const b = hitButton(state.mouse.uiC, state.mouse.uiR);
@@ -127,11 +145,19 @@ function initPointer() {
   });
 
   cv.addEventListener('pointerup', (e) => {
+    cancelLP();
     if (e.button === 0) state.mouse.leftDown = false;
     if (e.button === 2) state.mouse.rightDown = false;
+    if (e.pointerType === 'touch') state.mouse.rightDown = false;
+  });
+  cv.addEventListener('pointercancel', () => {
+    cancelLP();
+    state.mouse.leftDown = false;
+    state.mouse.rightDown = false;
   });
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
   cv.addEventListener('pointerleave', () => {
+    cancelLP();
     state.mouse.inField = false;
     state.mouse.leftDown = false;
     state.mouse.rightDown = false;

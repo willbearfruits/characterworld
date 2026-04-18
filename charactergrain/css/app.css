@@ -7,6 +7,19 @@ html, body {
 body { cursor: none; }
 #cv { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
 .hidden { display: none; }
+
+/* Touch / mobile only — desktop (fine pointer) is unaffected. */
+@media (pointer: coarse), (max-width: 720px) {
+  html, body {
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+  body { cursor: auto; }
+  #cv { touch-action: none; }
+}
 .io-overlay {
   position: fixed; inset: 0;
   background: rgba(3, 4, 3, 0.92);

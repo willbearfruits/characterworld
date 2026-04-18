@@ -25,10 +25,21 @@ export function resizeUI(canvas, w, h, dpr) {
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cell = Math.max(10, Math.min(18, Math.floor(Math.min(w, h) / 48)));
+
+  const coarse = (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  const narrow = w < 720;
+  state.compact = coarse || narrow;
+
+  if (state.compact) {
+    // Bigger cells on touch so glyphs are tappable without affecting desktop.
+    cell = Math.max(14, Math.min(22, Math.floor(Math.min(w, h) / 30)));
+  } else {
+    cell = Math.max(10, Math.min(18, Math.floor(Math.min(w, h) / 48)));
+  }
   cw = Math.floor(w / cell);
   ch = Math.floor(h / cell);
-  state.cols = Math.max(24, cw - LAYOUT.panelCols);
+  LAYOUT.panelCols = state.compact ? Math.max(14, Math.min(20, cw - 18)) : 26;
+  state.cols = Math.max(18, cw - LAYOUT.panelCols);
   state.rows = Math.max(10, ch - LAYOUT.menuRows - LAYOUT.waveRows - LAYOUT.infoRows - LAYOUT.statusRows);
   state.ui.cellPx = cell;
   state.ui.menuRows = LAYOUT.menuRows;
@@ -242,11 +253,11 @@ function drawRecorderOverlay() {
 
 function drawMenuBar() {
   fillRow(0, 0, cw, color('PANEL'));
-  const brand = 'CHARACTERGRAIN';
+  const brand = state.compact ? 'GRAIN' : 'CHARACTERGRAIN';
   for (let i = 0; i < brand.length; i++) {
     putChar(brand[i], 1 + i, 0, hsl((i * 28 + (performance.now() / 40)) % 360, 90, 65));
   }
-  let c = 17;
+  let c = brand.length + 3;
   const menuCols = ['HI', 'ACC', 'SUN', 'VIO', 'PNK'];
   let mi = 0;
   for (const name of MENU_NAMES) {
@@ -262,14 +273,16 @@ function drawMenuBar() {
     c += tag.length + 1;
     mi++;
   }
-  // Right-aligned status: algo, rule, play state, time
+  // Right-aligned status: algo, rule, play state, time — shortened on compact.
   const rule = CA_RULES[state.knobs.caRule % CA_RULES.length];
   const recTag = state.rec.active ? '● REC ' : '';
   const playTag = state.playing ? '>> PLAY' : '|| PAUSE';
   const t = formatTime(state.playElapsed);
-  const right = `${recTag}${playTag}  t:${t}  ALGO:${ALGOS[state.algo]}  RULE:${rule.name} `;
+  const right = state.compact
+    ? `${recTag}${playTag} ${t} `
+    : `${recTag}${playTag}  t:${t}  ALGO:${ALGOS[state.algo]}  RULE:${rule.name} `;
   const cRight = Math.max(c + 2, cw - right.length - 1);
-  putStr(right, cRight, 0, state.rec.active ? color('WARN') : color('ACC'));
+  if (cRight < cw) putStr(right, cRight, 0, state.rec.active ? color('WARN') : color('ACC'));
 }
 
 function drawMenuDropdown() {

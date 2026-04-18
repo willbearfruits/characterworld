@@ -55,6 +55,10 @@ export const state = {
 
   ui: { cellPx: 14, menuRows: 1, panelCols: 26, waveRows: 3, infoRows: 4, statusRows: 1 },
 
+  // Compact / touch layout. Set during resizeUI; desktop stays false.
+  compact: false,
+  compactApplied: false,
+
   // Drawn-UI button registry, rebuilt each frame.
   buttons: [],
   menuOpen: null,

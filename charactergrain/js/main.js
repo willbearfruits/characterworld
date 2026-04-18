@@ -20,6 +20,15 @@ function resize() {
     prevCols = state.cols;
     prevRows = state.rows;
   }
+  // Mobile: on first detection, collapse verbose panel sections so the essentials fit.
+  if (state.compact && !state.compactApplied) {
+    state.panelOpen = {
+      sound: true, scan: true, play: true,
+      growth: false, fx: false, canvas: false, stormcell: false,
+      algo: false, source: false, sample: false, prefs: false,
+    };
+    state.compactApplied = true;
+  }
 }
 
 function tick(now) {
