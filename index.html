@@ -3,21 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>characterworld</title>
-<meta name="description" content="A directory of character-only browser pieces — every visible form built from typed glyphs.">
+<title>characterworld/os</title>
+<meta name="description" content="CHARACTERWORLD/OS — a tiny operating system from a timeline that never invented pixels. Every program is character-only.">
 <meta name="author" content="willbear / glitches">
 <meta name="theme-color" content="#030403">
 <meta property="og:type" content="website">
-<meta property="og:title" content="characterworld">
-<meta property="og:description" content="A directory of character-only browser pieces. Every visible form is a typed glyph.">
+<meta property="og:title" content="characterworld/os">
+<meta property="og:description" content="A tiny operating system from a timeline that never invented pixels. Every program is character-only.">
 <meta property="og:image" content="https://willbearfruits.github.io/characterworld/charactershop/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="https://willbearfruits.github.io/characterworld/">
 <meta property="og:site_name" content="characterworld">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="characterworld">
-<meta name="twitter:description" content="A directory of character-only browser pieces.">
+<meta name="twitter:title" content="characterworld/os">
+<meta name="twitter:description" content="A tiny operating system from a timeline that never invented pixels.">
 <meta name="twitter:image" content="https://willbearfruits.github.io/characterworld/charactershop/og.png">
 <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20fill%3D%22%23030403%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2254%22%20text-anchor%3D%22middle%22%20font-family%3D%22Courier%20New%2Cmonospace%22%20font-size%3D%2256%22%20font-weight%3D%22bold%22%20fill%3D%22%23fff16a%22%3E%E2%8C%96%3C%2Ftext%3E%3C%2Fsvg%3E">
 <style>
@@ -33,21 +33,86 @@ a{color:inherit;text-decoration:none}
 (() => {
   const cv = document.getElementById('c');
   const ctx = cv.getContext('2d');
-  const BG = '#030403', DIM = '#2a3a2a', LOW = '#566956', MID = '#708a70', HI = '#d8f0c0', ACCENT = '#fff16a', WARM = '#ff8a5c', COOL = '#6ab7ff';
+  const BG = '#030403',
+        DIM = '#22301f',
+        LOW = '#4d6147',
+        MID = '#7a9572',
+        HI  = '#d8f0c0',
+        ACCENT = '#fff16a',
+        WARM = '#ff8a5c',
+        COOL = '#6ab7ff',
+        BAR  = '#3a5234';
 
-  const GLYPHS = '░▒▓█▁▂▃▄▅▆▇┼╳·∙•∘○◦◌◍◎◯∴∵⋮⋯▪▫◆◇‹›«»/\\|¦†‡§¶'.split('');
-  const ABOVE = ['\u0301','\u0302','\u0303','\u0306','\u030c','\u0342','\u035b','\u0360','\u0363','\u036a','\u036c'];
+  const NOISE = '░▒▓·∙•◦∘◌◍◎∴∵⋮⋯▪▫◆◇‹›«»/\\|¦†‡§¶'.split('');
 
   let cell = 16, cols = 0, rows = 0, dpr = 1;
-  let mouseC = -1, mouseR = -1, pressed = false, pressX = -1, pressY = -1;
+  let mouseC = -1, mouseR = -1, pressed = false;
   let t = 0;
 
-  // directory of sibling projects — the only content source
+  // ── program manifest ──
+  // each entry has a 12×2 "icon" — a tiny pictogram drawn with characters.
+  // pad icon rows with spaces to be exactly 12 chars wide.
   const ENTRIES = [
-    { id: '01', name: 'ATELIER', note: 'photoshop-style character-only paint program · beta', href: 'charactershop/', live: true },
-    { id: '02', name: 'FILM   ', note: 'character-only video editor · webcam → glyphs · beta', href: 'characterfilm/', live: true },
-    { id: '03', name: 'GRAIN  ', note: 'generative granular synth · glyph grains · keyboard + gamepad · beta', href: 'charactergrain/', live: true },
-    { id: '04', name: '——————', note: 'more character-only pieces coming soon',      href: null,             live: false },
+    {
+      id: '01', name: 'ATELIER', file: 'ATELIER.EXE',
+      tag: 'paint program',
+      note: 'photoshop-style canvas',
+      icon: [
+        '░▒▓█▓▒░ ╱╳╲',
+        '▒█▓ ▓ ▒░ ╳╱',
+      ],
+      href: 'charactershop/', live: true, key: '1',
+    },
+    {
+      id: '02', name: 'FILM', file: 'FILM.EXE',
+      tag: 'video editor',
+      note: 'webcam → glyphs',
+      icon: [
+        '►▣▣▣▣▣▣▣▣◄ ',
+        '▒▓░▒▓░▒▓░▒░',
+      ],
+      href: 'characterfilm/', live: true, key: '2',
+    },
+    {
+      id: '03', name: 'GRAIN', file: 'GRAIN.EXE',
+      tag: 'granular synth',
+      note: 'mycelium scheduler',
+      icon: [
+        '·∴·⋯∵·⋮·∴∵·',
+        '∘◦∙•∘·◦∙·∘∙ ',
+      ],
+      href: 'charactergrain/', live: true, key: '3',
+    },
+    {
+      id: '04', name: 'TRACKER', file: 'TRACKER.EXE',
+      tag: '16-voice tracker',
+      note: 'breakcore polyrhythm',
+      icon: [
+        '▪▫▪▫▪▫▪▫▪▫▪',
+        '░▒█░▒█░▒█░▒ ',
+      ],
+      href: 'charactertracker/', live: true, key: '4',
+    },
+    {
+      id: '05', name: 'DELVE', file: 'DELVE.EXE',
+      tag: 'roguelike',
+      note: 'walking grain bursts',
+      icon: [
+        '##.. @ ..## ',
+        '. # ░▒ # .  ',
+      ],
+      href: 'characterdelve/', live: true, key: '5',
+    },
+    {
+      id: '06', name: '------', file: 'TBA.SYS',
+      tag: 'reserved',
+      note: 'more pieces queued',
+      icon: [
+        '░ ░ ░ ░ ░ ░ ',
+        '· · · · · · ',
+      ],
+      href: null, live: false, key: null,
+    },
   ];
 
   function resize() {
@@ -56,7 +121,7 @@ a{color:inherit;text-decoration:none}
     cv.width = w * dpr; cv.height = h * dpr;
     cv.style.width = w + 'px'; cv.style.height = h + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    cell = Math.max(12, Math.min(20, Math.floor(Math.min(w, h) / 44)));
+    cell = Math.max(11, Math.min(20, Math.floor(Math.min(w, h) / 46)));
     cols = Math.floor(w / cell);
     rows = Math.floor(h / cell);
     ctx.font = `bold ${Math.floor(cell * 1.02)}px "Courier New", Courier, monospace`;
@@ -75,14 +140,14 @@ a{color:inherit;text-decoration:none}
     mouseR = Math.floor(y / cell);
   }
   cv.addEventListener('mousemove', updatePointer);
-  cv.addEventListener('mousedown', (e) => { updatePointer(e); pressed = true; pressX = mouseC; pressY = mouseR; });
-  cv.addEventListener('mouseup', (e) => { updatePointer(e); pressed = false; handleClick(); });
-  cv.addEventListener('mouseleave', () => { mouseC = mouseR = -1; pressed = false; });
-  cv.addEventListener('touchstart', (e) => { updatePointer(e); pressed = true; pressX = mouseC; pressY = mouseR; }, { passive: true });
-  cv.addEventListener('touchmove', updatePointer, { passive: true });
-  cv.addEventListener('touchend', (e) => { pressed = false; handleClick(); });
+  cv.addEventListener('mousedown', (e) => { updatePointer(e); pressed = true; });
+  cv.addEventListener('mouseup',   (e) => { updatePointer(e); pressed = false; handleClick(); });
+  cv.addEventListener('mouseleave',()  => { mouseC = mouseR = -1; pressed = false; });
+  cv.addEventListener('touchstart',(e) => { updatePointer(e); pressed = true; }, { passive: true });
+  cv.addEventListener('touchmove',  updatePointer, { passive: true });
+  cv.addEventListener('touchend',  (e) => { pressed = false; handleClick(); });
 
-  // hit-test rects rebuilt each frame
+  // ── hit-testing ──
   let hits = [];
   function addHit(c, r, w, h, action) { hits.push({ c, r, w, h, action }); }
   function hitAt(c, r) {
@@ -98,6 +163,7 @@ a{color:inherit;text-decoration:none}
   }
 
   function putChar(ch, c, r, color, alpha) {
+    if (c < 0 || r < 0 || c >= cols || r >= rows) return;
     ctx.globalAlpha = alpha ?? 1;
     ctx.fillStyle = color;
     ctx.fillText(ch, c * cell + cell / 2, r * cell + (cell - Math.floor(cell * 1.02)) / 2 + 1);
@@ -106,12 +172,8 @@ a{color:inherit;text-decoration:none}
   function putText(s, c, r, color, alpha) {
     for (let i = 0; i < s.length; i++) putChar(s[i], c + i, r, color, alpha);
   }
-  function putTextCenter(s, r, color, alpha) {
-    const c = Math.floor((cols - s.length) / 2);
-    putText(s, c, r, color, alpha);
-  }
 
-  // seeded hash for stable background pattern
+  // seeded hash
   function h2(x, y) {
     let n = (x * 374761393 + y * 668265263) ^ 0x27d4eb2d;
     n = (n ^ (n >>> 15)) * 2246822519;
@@ -119,170 +181,280 @@ a{color:inherit;text-decoration:none}
     return ((n ^ (n >>> 16)) >>> 0) / 0xffffffff;
   }
 
+  // ── background: sparse glyph field, the "vacuum" of the OS ──
   function drawBackground() {
-    // slow, sparse glyph field — a flowing density map
     const phase = t * 0.004;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const hn = h2(c, r);
         const wave = 0.5 + 0.5 * Math.sin(phase + c * 0.09 - r * 0.11 + hn * 6.28);
-        const d = wave * (0.35 + hn * 0.45);
-        if (d < 0.55) continue;
-        const g = GLYPHS[Math.floor((hn * 137 + t * 0.02) % GLYPHS.length + GLYPHS.length) % GLYPHS.length];
+        const d = wave * (0.32 + hn * 0.42);
+        if (d < 0.58) continue;
+        const g = NOISE[Math.floor((hn * 137 + t * 0.02) % NOISE.length + NOISE.length) % NOISE.length];
         const col = d > 0.88 ? LOW : DIM;
-        putChar(g, c, r, col, d > 0.88 ? 0.55 : 0.38);
+        putChar(g, c, r, col, d > 0.88 ? 0.45 : 0.30);
       }
     }
-  }
-
-  function drawFrame() {
-    // thin box frame around the content area
-    const pad = 2;
-    const x0 = pad, y0 = pad, x1 = cols - pad - 1, y1 = rows - pad - 1;
-    for (let c = x0 + 1; c < x1; c++) { putChar('─', c, y0, LOW, 0.6); putChar('─', c, y1, LOW, 0.6); }
-    for (let r = y0 + 1; r < y1; r++) { putChar('│', x0, r, LOW, 0.6); putChar('│', x1, r, LOW, 0.6); }
-    putChar('┌', x0, y0, LOW, 0.7); putChar('┐', x1, y0, LOW, 0.7);
-    putChar('└', x0, y1, LOW, 0.7); putChar('┘', x1, y1, LOW, 0.7);
-    return { x0, y0, x1, y1 };
-  }
-
-  function drawHeader() {
-    // top-of-frame tag
-    const tag = ' characterworld · index ';
-    const c = 4;
-    putText(tag, c, 2, MID, 0.9);
-    // accent corner
-    putChar('⌖', cols - 5, 2, ACCENT, 0.9);
-    // date
-    const date = '2026';
-    putText(date, cols - 9, 2, MID, 0.7);
-  }
-
-  function drawTitle(box) {
-    // giant block title — rendered as stacked character rows forming glyph shapes
-    const titleRow = box.y0 + 3;
-    // "characterworld" in big letters? Keep it monospace-typed but enlarged via combining marks row.
-    const title = 'characterworld';
-    const sub = 'a meta-folder of character-only browser pieces';
-    const decor = '·  ·  ·  ·  ·';
-    putTextCenter(title, titleRow, HI, 1);
-    // underline with dashes that breathe
-    const breathe = 0.55 + 0.45 * Math.sin(t * 0.04);
-    const lineC = Math.floor((cols - title.length) / 2);
-    for (let i = 0; i < title.length; i++) {
-      const ch = (i + Math.floor(t * 0.05)) % 6 === 0 ? '━' : '─';
-      putChar(ch, lineC + i, titleRow + 1, LOW, 0.35 + 0.4 * breathe);
+    // very faint scanlines
+    for (let r = 0; r < rows; r += 3) {
+      for (let c = 0; c < cols; c++) putChar('·', c, r, DIM, 0.05);
     }
-    putTextCenter(sub, titleRow + 3, MID, 0.9);
-    putTextCenter(decor, titleRow + 4, DIM, 0.7);
   }
 
-  function drawEntries(box) {
-    const startRow = Math.max(box.y0 + 10, Math.floor(rows / 2) - Math.floor(ENTRIES.length * 1.5));
-    const maxName = Math.max(...ENTRIES.map(e => e.name.length));
-    const maxNote = Math.max(...ENTRIES.map(e => e.note.length));
-    const inner = 4 + maxName + 4 + maxNote + 6;
-    const c0 = Math.max(box.x0 + 3, Math.floor((cols - inner) / 2));
+  // ── outer chrome: double-line border like a CRT bezel ──
+  function drawOuterFrame() {
+    const x0 = 0, y0 = 0, x1 = cols - 1, y1 = rows - 1;
+    for (let c = x0 + 1; c < x1; c++) { putChar('═', c, y0, MID, 0.85); putChar('═', c, y1, MID, 0.85); }
+    for (let r = y0 + 1; r < y1; r++) { putChar('║', x0, r, MID, 0.85); putChar('║', x1, r, MID, 0.85); }
+    putChar('╔', x0, y0, MID, 0.95); putChar('╗', x1, y0, MID, 0.95);
+    putChar('╚', x0, y1, MID, 0.95); putChar('╝', x1, y1, MID, 0.95);
+
+    // separator under menu bar
+    const menuSep = 2;
+    for (let c = x0 + 1; c < x1; c++) putChar('─', c, menuSep, LOW, 0.7);
+    putChar('╟', x0, menuSep, MID, 0.85); putChar('╢', x1, menuSep, MID, 0.85);
+
+    // separator above status bar
+    const statSep = y1 - 2;
+    for (let c = x0 + 1; c < x1; c++) putChar('─', c, statSep, LOW, 0.7);
+    putChar('╟', x0, statSep, MID, 0.85); putChar('╢', x1, statSep, MID, 0.85);
+
+    return { x0, y0, x1, y1, menuSep, statSep };
+  }
+
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  function clockStr() {
+    const d = new Date();
+    return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  }
+
+  // ── menu bar: title left, menus middle, clock right ──
+  function drawMenuBar(box) {
+    const r = 1;
+    // title
+    const title = ' CHARACTERWORLD/OS ';
+    putText(title, box.x0 + 2, r, ACCENT, 1);
+    // version mark
+    putText(' v0.5 ', box.x0 + 2 + title.length, r, MID, 0.85);
+
+    // menus
+    const menus = [' FILE ', ' RUN ', ' VIEW ', ' HELP '];
+    let mc = box.x0 + 2 + title.length + 8;
+    const totalMenus = menus.reduce((a, s) => a + s.length, 0);
+    if (mc + totalMenus < box.x1 - 14) {
+      for (const m of menus) {
+        const hovered = mouseR === r && mouseC >= mc && mouseC < mc + m.length;
+        putText(m, mc, r, hovered ? ACCENT : HI, hovered ? 1 : 0.85);
+        if (hovered) addHit(mc, r, m.length, 1, () => {});
+        mc += m.length + 1;
+      }
+    }
+
+    // clock + corner accent
+    const cs = clockStr();
+    const dateStr = '2026·' + cs;
+    putText(dateStr, box.x1 - dateStr.length - 2, r, MID, 0.9);
+    putChar('⌖', box.x1 - 1, r, ACCENT, 0.9 + 0.1 * Math.sin(t * 0.1));
+  }
+
+  // ── prompt line below the menu bar ──
+  function drawPrompt(box) {
+    const r = box.menuSep + 2;
+    const txt = 'C:\\CHARACTERWORLD\\>';
+    putText(txt, box.x0 + 3, r, HI, 0.95);
+    // blinking cursor
+    const blink = Math.floor(t / 30) % 2 === 0;
+    putChar(blink ? '█' : '▒', box.x0 + 3 + txt.length + 1, r, ACCENT, blink ? 0.95 : 0.5);
+    // boot-tag right side
+    const stamp = 'READY · 6 PROGRAMS · ' + ENTRIES.filter(e => e.live).length + ' LIVE';
+    if (box.x1 - stamp.length - 3 > box.x0 + 3 + txt.length + 8) {
+      putText(stamp, box.x1 - stamp.length - 3, r, MID, 0.7);
+    }
+  }
+
+  // ── program tile ──
+  // 22 wide × 5 tall window
+  const TW = 22, TH = 5;
+  function drawTile(e, c0, r0, idx) {
+    const hovered = mouseC >= c0 && mouseC < c0 + TW && mouseR >= r0 && mouseR < r0 + TH && e.live;
+    const focusCol = hovered ? ACCENT : (e.live ? MID : LOW);
+    const titleCol = hovered ? ACCENT : (e.live ? HI : LOW);
+    const innerCol = e.live ? (hovered ? HI : MID) : LOW;
+    const al = e.live ? 1 : 0.55;
+
+    // top border with embedded title  ┌─[ 01 ATELIER  ]──┐
+    const titleStr = '[ ' + e.id + ' ' + e.name.padEnd(7, ' ') + ']';
+    const top = '┌─' + titleStr + '─'.repeat(Math.max(0, TW - 4 - titleStr.length)) + '┐';
+    for (let i = 0; i < TW; i++) {
+      const ch = top[i] || ' ';
+      const isTitleChar = i >= 2 && i < 2 + titleStr.length;
+      putChar(ch, c0 + i, r0, isTitleChar ? titleCol : focusCol, al);
+    }
+
+    // sides
+    putChar('│', c0, r0 + 1, focusCol, al);
+    putChar('│', c0 + TW - 1, r0 + 1, focusCol, al);
+    putChar('│', c0, r0 + 2, focusCol, al);
+    putChar('│', c0 + TW - 1, r0 + 2, focusCol, al);
+    putChar('│', c0, r0 + 3, focusCol, al);
+    putChar('│', c0 + TW - 1, r0 + 3, focusCol, al);
+
+    // icon rows (centered in inner width = TW-4)
+    const innerW = TW - 4;
+    const ic0 = c0 + 2 + Math.max(0, Math.floor((innerW - 12) / 2));
+    const a1 = e.live ? (hovered ? 1 : 0.9) : 0.45;
+    const iconCol1 = e.live ? (hovered ? ACCENT : HI) : LOW;
+    const iconCol2 = e.live ? (hovered ? HI : MID) : LOW;
+    // subtle per-frame jitter so icons feel alive
+    const flicker = (i) => 0.88 + 0.12 * Math.sin(t * 0.07 + idx + i * 0.4);
+    for (let i = 0; i < 12; i++) {
+      const ch1 = e.icon[0][i] || ' ';
+      const ch2 = e.icon[1][i] || ' ';
+      putChar(ch1, ic0 + i, r0 + 1, iconCol1, a1 * flicker(i));
+      putChar(ch2, ic0 + i, r0 + 2, iconCol2, a1 * flicker(i + 7));
+    }
+
+    // tag line, centered
+    const tagW = Math.min(e.tag.length, innerW);
+    const tc0 = c0 + 2 + Math.max(0, Math.floor((innerW - tagW) / 2));
+    putText(e.tag.slice(0, tagW), tc0, r0 + 3, innerCol, al);
+
+    // bottom border with action  └─[ ↵ RUN ]───────┘
+    let action;
+    if (e.live) action = hovered ? '[ ↵ RUN ]' : '[   RUN   ]';
+    else action = '( queued  )';
+    const bot = '└─' + action + '─'.repeat(Math.max(0, TW - 4 - action.length)) + '┘';
+    for (let i = 0; i < TW; i++) {
+      const ch = bot[i] || ' ';
+      const isAction = i >= 2 && i < 2 + action.length;
+      const col = isAction ? (hovered ? ACCENT : (e.live ? HI : LOW)) : focusCol;
+      const a  = isAction && hovered ? (0.7 + 0.3 * Math.sin(t * 0.18)) : al;
+      putChar(ch, c0 + i, r0 + TH - 1, col, a);
+    }
+
+    if (e.live && e.href) {
+      addHit(c0, r0, TW, TH, () => { window.location.href = e.href; });
+    }
+  }
+
+  function drawDesktop(box) {
+    const startR = box.menuSep + 4;
+    const endR = box.statSep - 2;
+    const availW = box.x1 - box.x0 - 4;
+    const availH = endR - startR;
+
+    const gapX = 2, gapY = 1;
+    const tilesPerRow = Math.max(1, Math.min(ENTRIES.length, Math.floor((availW + gapX) / (TW + gapX))));
+    const totalRows = Math.ceil(ENTRIES.length / tilesPerRow);
+    const gridH = totalRows * TH + (totalRows - 1) * gapY;
+    const gridW = tilesPerRow * TW + (tilesPerRow - 1) * gapX;
+    const gridC0 = box.x0 + 2 + Math.max(0, Math.floor((availW - gridW) / 2));
+    const gridR0 = startR + Math.max(0, Math.floor((availH - gridH) / 2));
 
     ENTRIES.forEach((e, i) => {
-      const r = startRow + i * 3;
-      const hovered = mouseR === r && mouseC >= c0 && mouseC < c0 + inner && e.href;
-      const color = e.live ? (hovered ? ACCENT : HI) : LOW;
-      const alpha = e.live ? 1 : 0.6;
-
-      // row bracket
-      const bracketL = hovered ? '▸' : (e.live ? '[' : ' ');
-      const bracketR = hovered ? '◂' : (e.live ? ']' : ' ');
-      putText(bracketL + ' ' + e.id + ' ' + bracketR, c0, r, e.live ? (hovered ? ACCENT : MID) : DIM, alpha);
-
-      // name
-      const nameC = c0 + 8;
-      putText(e.name.padEnd(maxName, ' '), nameC, r, color, alpha);
-
-      // divider
-      putChar('·', nameC + maxName + 1, r, DIM, 0.6);
-
-      // note
-      const noteC = nameC + maxName + 3;
-      putText(e.note, noteC, r, e.live ? (hovered ? HI : MID) : LOW, alpha);
-
-      // arrow + hover shimmer
-      if (e.live) {
-        const arrowC = noteC + maxNote + 2;
-        const shimmer = hovered ? (0.5 + 0.5 * Math.sin(t * 0.18)) : 0.7;
-        putChar('→', arrowC, r, hovered ? ACCENT : MID, shimmer);
-      }
-
-      // register hit
-      if (e.live && e.href) {
-        addHit(c0, r, inner, 1, () => { window.location.href = e.href; });
-      }
-
-      // decoration row below each entry
-      if (hovered && e.live) {
-        for (let k = 0; k < inner; k++) {
-          putChar('·', c0 + k, r + 1, LOW, 0.25 + 0.25 * Math.sin(t * 0.1 + k * 0.3));
-        }
-      }
+      const tr = Math.floor(i / tilesPerRow);
+      const tc = i % tilesPerRow;
+      const c0 = gridC0 + tc * (TW + gapX);
+      const r0 = gridR0 + tr * (TH + gapY);
+      drawTile(e, c0, r0, i);
     });
   }
 
-  function drawFooter(box) {
-    const r = box.y1 - 2;
-    const left = ' willbear · glitches ';
-    const right = ' github.com/willbearfruits/characterworld → ';
-    putText(left, box.x0 + 2, r, MID, 0.8);
-    putText(right, box.x1 - right.length - 1, r, MID, 0.8);
+  // ── status bar at bottom ──
+  function drawStatusBar(box) {
+    const r = box.y1 - 1;
 
-    // register hit for the github link
-    addHit(box.x1 - right.length - 1, r, right.length, 1, () => {
-      window.open('https://github.com/willbearfruits/characterworld', '_blank');
-    });
+    // function keys
+    const keys = [
+      { k: 'F1', label: 'HELP', action: () => window.open('https://github.com/willbearfruits/characterworld', '_blank') },
+      { k: 'F2', label: 'PAINT', action: () => location.href = 'charactershop/' },
+      { k: 'F3', label: 'FILM', action: () => location.href = 'characterfilm/' },
+      { k: 'F4', label: 'GRAIN', action: () => location.href = 'charactergrain/' },
+      { k: 'F5', label: 'TRACK', action: () => location.href = 'charactertracker/' },
+      { k: 'F6', label: 'DELVE', action: () => location.href = 'characterdelve/' },
+    ];
+    let cx = box.x0 + 2;
+    for (const fk of keys) {
+      const seg = fk.k + ' ' + fk.label;
+      if (cx + seg.length + 2 > box.x1 - 22) break;
+      const hovered = mouseR === r && mouseC >= cx && mouseC < cx + seg.length;
+      putText(fk.k, cx, r, hovered ? ACCENT : ACCENT, hovered ? 1 : 0.9);
+      putText(' ' + fk.label, cx + 2, r, hovered ? ACCENT : HI, hovered ? 1 : 0.85);
+      addHit(cx, r, seg.length, 1, fk.action);
+      cx += seg.length + 2;
+    }
 
-    // law line
-    const law = 'every visible form is a typed glyph · no images · no svg · no path geometry';
-    putTextCenter(law, box.y1 - 4, LOW, 0.7);
+    // right side: MEM bar + glyph rate (decorative)
+    const memSlots = 8;
+    const memFill = Math.floor(memSlots * (0.55 + 0.25 * Math.sin(t * 0.013) + 0.1 * Math.sin(t * 0.07)));
+    let memBar = '';
+    for (let i = 0; i < memSlots; i++) memBar += i < memFill ? '▓' : '░';
+    const rate = 1800 + Math.floor(600 * (0.5 + 0.5 * Math.sin(t * 0.019)));
+    const right = 'MEM ' + memBar + ' · ' + rate + ' glyph/s';
+    if (box.x1 - right.length - 2 > cx + 2) {
+      // MEM label
+      putText('MEM ', box.x1 - right.length - 2, r, MID, 0.85);
+      // bar with color split
+      for (let i = 0; i < memSlots; i++) {
+        const col = i < memFill ? (i > 5 ? WARM : HI) : DIM;
+        putChar(memBar[i], box.x1 - right.length - 2 + 4 + i, r, col, 0.9);
+      }
+      putText(' · ' + rate + ' glyph/s', box.x1 - right.length - 2 + 4 + memSlots, r, MID, 0.85);
+    }
   }
 
+  // ── cursor ──
   function drawCursor() {
     if (mouseC < 0 || mouseR < 0) return;
     const h = hitAt(mouseC, mouseR);
-    const mark = h ? '◈' : '·';
+    const mark = h ? '◈' : '+';
     const color = h ? ACCENT : HI;
     const alpha = 0.7 + 0.3 * Math.sin(t * 0.2);
-    // little cross ring
     putChar(mark, mouseC, mouseR, color, alpha);
-    if (h) {
-      putChar('╴', mouseC - 1, mouseR, color, 0.5);
-      putChar('╶', mouseC + 1, mouseR, color, 0.5);
-      putChar('╷', mouseC, mouseR + 1, color, 0.5);
-      putChar('╵', mouseC, mouseR - 1, color, 0.5);
-    }
   }
 
   function render() {
     t++;
-    // clear
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, cv.width, cv.height);
     hits = [];
 
     drawBackground();
-    const box = drawFrame();
-    drawHeader();
-    drawTitle(box);
-    drawEntries(box);
-    drawFooter(box);
+    const box = drawOuterFrame();
+    drawMenuBar(box);
+    drawPrompt(box);
+    drawDesktop(box);
+    drawStatusBar(box);
     drawCursor();
 
     requestAnimationFrame(render);
   }
   render();
 
-  // keyboard shortcut: 1 → atelier
+  // keyboard shortcuts
   window.addEventListener('keydown', (e) => {
-    if (e.key === '1') window.location.href = 'charactershop/';
-    if (e.key === '2') window.location.href = 'characterfilm/';
+    const map = {
+      '1': 'charactershop/',
+      '2': 'characterfilm/',
+      '3': 'charactergrain/',
+      '4': 'charactertracker/',
+      '5': 'characterdelve/',
+    };
+    const fmap = {
+      'F1': 'github',
+      'F2': 'charactershop/',
+      'F3': 'characterfilm/',
+      'F4': 'charactergrain/',
+      'F5': 'charactertracker/',
+      'F6': 'characterdelve/',
+    };
+    if (map[e.key]) { window.location.href = map[e.key]; return; }
+    if (fmap[e.key]) {
+      e.preventDefault();
+      if (fmap[e.key] === 'github') window.open('https://github.com/willbearfruits/characterworld', '_blank');
+      else window.location.href = fmap[e.key];
+      return;
+    }
     if (e.key === 'g' || e.key === 'G') window.open('https://github.com/willbearfruits/characterworld', '_blank');
   });
 })();
