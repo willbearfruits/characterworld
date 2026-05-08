@@ -671,6 +671,8 @@ function mycStep(){
   while(myc.tips.length < 2) mycSpawn();
 }
 function drawWallpaper(){
+  // ensure mycelium is initialised even on the first odd frame
+  if(!myc.heat || myc.cols!==cols || myc.rows!==rows) mycInit();
   // step on every other frame — half the motion
   if(t % 2 === 0) mycStep();
   for(let r=0;r<rows;r++){
