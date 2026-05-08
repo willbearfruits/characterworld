@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>characterworld/os</title>
-<meta name="description" content="CHARACTERWORLD/OS — a tiny operating system from a timeline that never invented pixels. Every program is character-only.">
+<meta name="description" content="CHARACTERWORLD/OS — a character-only desktop. Drag icons. Open windows. Run programs. Every glyph a pixel.">
 <meta name="author" content="willbear / glitches">
 <meta name="theme-color" content="#030403">
 <meta property="og:type" content="website">
 <meta property="og:title" content="characterworld/os">
-<meta property="og:description" content="A tiny operating system from a timeline that never invented pixels. Every program is character-only.">
+<meta property="og:description" content="A character-only desktop OS. Drag icons. Open windows. Run programs.">
 <meta property="og:image" content="https://willbearfruits.github.io/characterworld/charactershop/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -17,446 +17,2672 @@
 <meta property="og:site_name" content="characterworld">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="characterworld/os">
-<meta name="twitter:description" content="A tiny operating system from a timeline that never invented pixels.">
+<meta name="twitter:description" content="A character-only desktop OS.">
 <meta name="twitter:image" content="https://willbearfruits.github.io/characterworld/charactershop/og.png">
 <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20fill%3D%22%23030403%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2254%22%20text-anchor%3D%22middle%22%20font-family%3D%22Courier%20New%2Cmonospace%22%20font-size%3D%2256%22%20font-weight%3D%22bold%22%20fill%3D%22%23fff16a%22%3E%E2%8C%96%3C%2Ftext%3E%3C%2Fsvg%3E">
 <style>
-html,body{margin:0;height:100%;overflow:hidden;background:#030403;color:#d8f0c0;font-family:"Courier New",Courier,monospace}
-body{cursor:none;user-select:none;-webkit-user-select:none}
-canvas{display:block;width:100vw;height:100vh;background:#030403}
-a{color:inherit;text-decoration:none}
+  :root{
+    /* grain-derived palette */
+    --bg:#05060a; --panel:#0a0c14;
+    --dim:#2a2f3a; --low:#565668; --mid:#7a8398; --hi:#9dff7a; --ink:#eaeaf2;
+    --acc:#5ef2ff; --cursor:#ffdc4d; --warn:#ff5e78;
+    --vio:#c78bff; --pnk:#ff74c8; --sun:#ffc933; --aqu:#5ce5c7;
+    --ora:#ff9e3d; --sky:#6bb5ff; --lim:#c4ff5c; --phero:#6bbf92;
+  }
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:"Courier New",Courier,monospace}
+  body{user-select:none;-webkit-user-select:none}
+  #bg{position:absolute;inset:0;width:100vw;height:100vh;background:var(--bg);display:block;z-index:0;cursor:none}
+  #popups{position:absolute;inset:0;width:100vw;height:100vh;display:block;z-index:100;pointer-events:none;background:transparent}
+  .win{cursor:default}
+  #winLayer{position:absolute;inset:0;pointer-events:none;z-index:10}
+  .win{
+    position:absolute;
+    background:var(--panel);
+    color:var(--ink);
+    pointer-events:auto;
+    box-shadow:0 0 0 1px var(--low), 0 0 0 2px rgba(0,0,0,0.4), 0 12px 30px rgba(0,0,0,0.55);
+    display:flex;flex-direction:column;
+    font-family:"Courier New",Courier,monospace;
+    transition:box-shadow 120ms;
+  }
+  .win.focused{box-shadow:0 0 0 1px var(--accent), 0 0 0 2px rgba(94,242,255,0.18), 0 14px 36px rgba(0,0,0,0.7)}
+  .titlebar{
+    height:22px;line-height:22px;
+    padding:0 6px;
+    background:linear-gradient(180deg, #11141d 0%, #07090e 100%);
+    border-bottom:1px solid var(--low);
+    color:var(--mid);
+    font-size:13px;font-weight:bold;letter-spacing:0.5px;
+    display:flex;align-items:center;gap:6px;
+    cursor:grab;white-space:nowrap;overflow:hidden;
+    user-select:none;
+  }
+  .win.focused .titlebar{color:var(--ink);border-bottom-color:var(--acc)}
+  .titlebar.dragging{cursor:grabbing}
+  .titlebar .glyph{color:var(--cursor);text-shadow:0 0 6px rgba(255,220,77,0.55)}
+  .titlebar .name{flex:1;overflow:hidden;text-overflow:ellipsis}
+  .titlebar .ctrl{cursor:pointer;padding:0 4px;color:var(--mid);font-weight:bold}
+  .titlebar .ctrl:hover{color:var(--warm)}
+  .titlebar .ctrl.close:hover{color:#ff5050}
+  .content{flex:1;position:relative;overflow:hidden;background:var(--bg)}
+  .content iframe{width:100%;height:100%;border:0;background:var(--bg);display:block}
+  .content canvas{width:100%;height:100%;display:block;background:var(--bg)}
+  /* prevent iframe from stealing pointer during drags */
+  body.dragging .content iframe{pointer-events:none}
+  body.dragging .content canvas{pointer-events:none}
+  .resizer{
+    position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;
+    color:var(--low);font-size:14px;line-height:14px;text-align:right;padding-right:2px;
+  }
+  .resizer:hover{color:var(--accent)}
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
+<canvas id="bg"></canvas>
+<div id="winLayer"></div>
+<canvas id="popups"></canvas>
 <script>
 (() => {
-  const cv = document.getElementById('c');
-  const ctx = cv.getContext('2d');
-  const BG = '#030403',
-        DIM = '#22301f',
-        LOW = '#4d6147',
-        MID = '#7a9572',
-        HI  = '#d8f0c0',
-        ACCENT = '#fff16a',
-        WARM = '#ff8a5c',
-        COOL = '#6ab7ff',
-        BAR  = '#3a5234';
+"use strict";
+// ─────────────────────────────────────────────────────────────────────────
+// CHARACTERWORLD/OS — a character-only desktop.
+// Background canvas draws wallpaper, icons, taskbar, start menu.
+// Each program opens as a DOM window (.win) — iframes for external apps,
+// per-window <canvas> for built-ins (BROWSER, CALC, SNAKE).
+// ─────────────────────────────────────────────────────────────────────────
 
-  const NOISE = '░▒▓·∙•◦∘◌◍◎∴∵⋮⋯▪▫◆◇‹›«»/\\|¦†‡§¶'.split('');
+const bg = document.getElementById('bg');
+const ctx = bg.getContext('2d');
+const winLayer = document.getElementById('winLayer');
+const popups = document.getElementById('popups');
+const pctx = popups.getContext('2d');
 
-  let cell = 16, cols = 0, rows = 0, dpr = 1;
-  let mouseC = -1, mouseR = -1, pressed = false;
-  let t = 0;
+// grain-derived palette — used everywhere
+const BG='#05060a', PANEL='#0a0c14',
+      DIM='#2a2f3a', LOW='#565668', MID='#7a8398', INK='#eaeaf2',
+      HI='#9dff7a', ACC='#5ef2ff', WARN='#ff5e78', CURSOR='#ffdc4d',
+      VIO='#c78bff', PNK='#ff74c8', SUN='#ffc933', AQU='#5ce5c7',
+      ORA='#ff9e3d', SKY='#6bb5ff', LIM='#c4ff5c', PHERO='#6bbf92';
+// legacy aliases used in existing code
+const ACCENT=CURSOR, WARM=ORA, COOL=SKY;
+// cycled hues for section labels / pills / sort bars
+const RAINBOW = [HI, ACC, SUN, VIO, PNK, AQU, ORA, LIM, SKY, PHERO];
 
-  // ── program manifest ──
-  // each entry has a 12×2 "icon" — a tiny pictogram drawn with characters.
-  // pad icon rows with spaces to be exactly 12 chars wide.
-  const ENTRIES = [
-    {
-      id: '01', name: 'ATELIER', file: 'ATELIER.EXE',
-      tag: 'paint program',
-      note: 'photoshop-style canvas',
-      icon: [
-        '░▒▓█▓▒░ ╱╳╲',
-        '▒█▓ ▓ ▒░ ╳╱',
-      ],
-      href: 'charactershop/', live: true, key: '1',
-    },
-    {
-      id: '02', name: 'FILM', file: 'FILM.EXE',
-      tag: 'video editor',
-      note: 'webcam → glyphs',
-      icon: [
-        '►▣▣▣▣▣▣▣▣◄ ',
-        '▒▓░▒▓░▒▓░▒░',
-      ],
-      href: 'characterfilm/', live: true, key: '2',
-    },
-    {
-      id: '03', name: 'GRAIN', file: 'GRAIN.EXE',
-      tag: 'granular synth',
-      note: 'mycelium scheduler',
-      icon: [
-        '·∴·⋯∵·⋮·∴∵·',
-        '∘◦∙•∘·◦∙·∘∙ ',
-      ],
-      href: 'charactergrain/', live: true, key: '3',
-    },
-    {
-      id: '04', name: 'TRACKER', file: 'TRACKER.EXE',
-      tag: '16-voice tracker',
-      note: 'breakcore polyrhythm',
-      icon: [
-        '▪▫▪▫▪▫▪▫▪▫▪',
-        '░▒█░▒█░▒█░▒ ',
-      ],
-      href: 'charactertracker/', live: true, key: '4',
-    },
-    {
-      id: '05', name: 'DELVE', file: 'DELVE.EXE',
-      tag: 'roguelike',
-      note: 'walking grain bursts',
-      icon: [
-        '##.. @ ..## ',
-        '. # ░▒ # .  ',
-      ],
-      href: 'characterdelve/', live: true, key: '5',
-    },
-    {
-      id: '06', name: '------', file: 'TBA.SYS',
-      tag: 'reserved',
-      note: 'more pieces queued',
-      icon: [
-        '░ ░ ░ ░ ░ ░ ',
-        '· · · · · · ',
-      ],
-      href: null, live: false, key: null,
-    },
-  ];
+const NOISE = '░▒▓·∙•◦∘◌◍◎∴∵⋮⋯▪▫◆◇‹›«»/\\|¦†‡§¶'.split('');
+const ZALGO_ABOVE = ['́','̂','̃','̆','̌','͛','ͣ','ͬ'];
+// glyphs for mycelium heat tiers — colder → hotter
+const HEAT_GLYPH = ['·','∘','◦','○','◯','●','◉','✺'];
 
-  function resize() {
-    dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-    const w = window.innerWidth, h = window.innerHeight;
-    cv.width = w * dpr; cv.height = h * dpr;
-    cv.style.width = w + 'px'; cv.style.height = h + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    cell = Math.max(11, Math.min(20, Math.floor(Math.min(w, h) / 46)));
-    cols = Math.floor(w / cell);
-    rows = Math.floor(h / cell);
-    ctx.font = `bold ${Math.floor(cell * 1.02)}px "Courier New", Courier, monospace`;
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'center';
+let cell=14, cols=0, rows=0, dpr=1;
+let mouseX=0, mouseY=0, mouseC=-1, mouseR=-1;
+let t=0;
+let zTop=100;
+let startMenuOpen=false;
+let dragOp=null; // {kind:'icon'|'window'|'resize', ...}
+
+// ─────────────────────────────────────────────────────────────────────────
+// helpers
+// ─────────────────────────────────────────────────────────────────────────
+function pad2(n){return n<10?'0'+n:''+n}
+function clockStr(){const d=new Date();return pad2(d.getHours())+':'+pad2(d.getMinutes())+':'+pad2(d.getSeconds())}
+function h2(x,y){let n=(x*374761393+y*668265263)^0x27d4eb2d;n=(n^(n>>>15))*2246822519;n=(n^(n>>>13))*3266489917;return((n^(n>>>16))>>>0)/0xffffffff}
+
+// generic char-grid putters that take a (ctx, cell) — works for bg or any window canvas
+function makePut(c, cs){
+  const ascent = Math.floor(cs*1.02);
+  c.font = `bold ${ascent}px "Courier New", Courier, monospace`;
+  c.textBaseline='top';
+  c.textAlign='center';
+  return {
+    put(ch, col, row, color, alpha){
+      c.globalAlpha = alpha ?? 1;
+      c.fillStyle = color;
+      c.fillText(ch, col*cs + cs/2, row*cs + (cs-ascent)/2 + 1);
+      c.globalAlpha = 1;
+    },
+    text(s, col, row, color, alpha){
+      for(let i=0;i<s.length;i++) this.put(s[i], col+i, row, color, alpha);
+    },
+    cell: cs,
+  };
+}
+let putBg; // bound after resize
+let putPop;
+
+// ─────────────────────────────────────────────────────────────────────────
+// resize
+// ─────────────────────────────────────────────────────────────────────────
+function resize(){
+  dpr = Math.max(1, Math.min(2, window.devicePixelRatio||1));
+  const w=window.innerWidth, h=window.innerHeight;
+  bg.width=w*dpr; bg.height=h*dpr;
+  bg.style.width=w+'px'; bg.style.height=h+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  popups.width=w*dpr; popups.height=h*dpr;
+  popups.style.width=w+'px'; popups.style.height=h+'px';
+  pctx.setTransform(dpr,0,0,dpr,0,0);
+  cell = Math.max(11, Math.min(18, Math.floor(Math.min(w,h)/52)));
+  cols = Math.floor(w/cell);
+  rows = Math.floor(h/cell);
+  putBg = makePut(ctx, cell);
+  putPop = makePut(pctx, cell);
+  // tell every window to refresh its inner canvas
+  for(const win of windows) if(win.kind==='builtin' && win.instance && win.instance.resize) win.instance.resize();
+}
+window.addEventListener('resize', resize);
+
+// ─────────────────────────────────────────────────────────────────────────
+// ICONS — apps shown on the desktop (positions in cell coords, draggable)
+// ─────────────────────────────────────────────────────────────────────────
+// each icon art is exactly 9 chars wide × 3 rows tall
+// `accent` is the icon's primary hue; `accent2` is its secondary tint
+const APPS = [
+  { id:'atelier', label:'ATELIER', kind:'iframe', src:'charactershop/',
+    accent:PNK, accent2:VIO,
+    art:[' ░▒▓█▒░ ', ' ▒▓ ╳ ▓▒','  ╱╳╲   '] },
+  { id:'film', label:'FILM', kind:'iframe', src:'characterfilm/',
+    accent:SKY, accent2:AQU,
+    art:[' ►▣▣▣◄ ', '▣▒▓░▒▓▣','  ┄┄┄  '] },
+  { id:'grain', label:'GRAIN', kind:'iframe', src:'charactergrain/',
+    accent:PHERO, accent2:LIM,
+    art:[' ·∴⋯∵· ', '∘◦∙•∘∙∘','  ⋮ ⋮  '] },
+  { id:'tracker', label:'TRACKER', kind:'iframe', src:'charactertracker/',
+    accent:VIO, accent2:PNK,
+    art:['▪▫▪▫▪▫▪', '░▒█░▒█░','▪▫▪▫▪▫▪'] },
+  { id:'delve', label:'DELVE', kind:'iframe', src:'characterdelve/',
+    accent:ORA, accent2:SUN,
+    art:[' ##.@.#', ' #.░▒.#','  ###  '] },
+  { id:'browser', label:'BROWSER', kind:'builtin', factory:()=>new Browser(),
+    accent:ACC, accent2:SKY,
+    art:['┌─────┐', '│http:│','└─────┘'] },
+  { id:'files', label:'FILES', kind:'builtin', factory:()=>new Files(),
+    accent:SUN, accent2:ORA,
+    art:['┌── ▾─┐', '│dir/ │','└─────┘'] },
+  { id:'calc', label:'CALC', kind:'builtin', factory:()=>new Calculator(),
+    accent:CURSOR, accent2:SUN,
+    art:['┌──┬─┐', '│42│=│','└──┴─┘'] },
+  { id:'snake', label:'SNAKE', kind:'builtin', factory:()=>new Snake(),
+    accent:LIM, accent2:HI,
+    art:[' ▓▓▓▓▒', ' ▒   ●','▓▓▓▓▒ '] },
+  { id:'sort', label:'SORT', kind:'builtin', factory:()=>new Sorter(),
+    accent:AQU, accent2:LIM,
+    art:['▁▂▃▄▅▆▇', '▂▄▆▁▃▅▇','▁▃▅▂▄▆▇'] },
+  { id:'life', label:'LIFE', kind:'builtin', factory:()=>new Life(),
+    accent:PHERO, accent2:LIM,
+    art:[' ░ ▒ ░ ', '▒ ▓ ▒ ░',' ░ ▒ ░ '] },
+  { id:'term', label:'TERM', kind:'builtin', factory:()=>new Term(),
+    accent:LIM, accent2:HI,
+    art:[' $_     ', ' ls -al ',' >      '] },
+  { id:'clock', label:'CLOCK', kind:'builtin', factory:()=>new Clock(),
+    accent:CURSOR, accent2:SUN,
+    art:[' ┌ ╲ ┐ ', ' │ │ │ ',' └ ─ ┘ '] },
+  { id:'about', label:'README', kind:'builtin', factory:()=>new About(),
+    accent:INK, accent2:MID,
+    art:['┌─────┐', '│ ?   │','└─────┘'] },
+];
+const ICON_W=9, ICON_H=4; // 3 art + 1 label
+
+const ICONS_KEY = 'cwos.icons.v1';
+let icons = []; // [{appId, c, r}]
+function defaultIconLayout(){
+  const out=[];
+  let c=2, r=2;
+  for(const a of APPS){
+    out.push({appId:a.id, c, r});
+    r += ICON_H + 1;
+    if(r > rows - 6){ r=2; c += ICON_W + 2; }
   }
-  resize();
-  window.addEventListener('resize', resize);
-
-  // pointer → cell
-  function updatePointer(e) {
-    const r = cv.getBoundingClientRect();
-    const x = (e.clientX ?? (e.touches?.[0]?.clientX)) - r.left;
-    const y = (e.clientY ?? (e.touches?.[0]?.clientY)) - r.top;
-    mouseC = Math.floor(x / cell);
-    mouseR = Math.floor(y / cell);
-  }
-  cv.addEventListener('mousemove', updatePointer);
-  cv.addEventListener('mousedown', (e) => { updatePointer(e); pressed = true; });
-  cv.addEventListener('mouseup',   (e) => { updatePointer(e); pressed = false; handleClick(); });
-  cv.addEventListener('mouseleave',()  => { mouseC = mouseR = -1; pressed = false; });
-  cv.addEventListener('touchstart',(e) => { updatePointer(e); pressed = true; }, { passive: true });
-  cv.addEventListener('touchmove',  updatePointer, { passive: true });
-  cv.addEventListener('touchend',  (e) => { pressed = false; handleClick(); });
-
-  // ── hit-testing ──
-  let hits = [];
-  function addHit(c, r, w, h, action) { hits.push({ c, r, w, h, action }); }
-  function hitAt(c, r) {
-    for (let i = hits.length - 1; i >= 0; i--) {
-      const b = hits[i];
-      if (c >= b.c && c < b.c + b.w && r >= b.r && r < b.r + b.h) return b;
+  return out;
+}
+function loadIcons(){
+  let stored = null;
+  try{
+    const raw = localStorage.getItem(ICONS_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed)) stored = parsed;
     }
-    return null;
+  }catch(_){}
+  if(!stored || !stored.length) return defaultIconLayout();
+  // append defaults for any apps not present (handles upgrades)
+  const have = new Set(stored.map(i=>i.appId));
+  const missing = APPS.filter(a=>!have.has(a.id));
+  if(missing.length){
+    // place each below the lowest existing icon in the same column when possible
+    let r = stored.reduce((m,i)=>Math.max(m, i.r), 0) + ICON_H + 1;
+    let c = 2;
+    for(const a of missing){
+      if(r > rows - 6){ r = 2; c += ICON_W + 2; }
+      stored.push({appId:a.id, c, r});
+      r += ICON_H + 1;
+    }
   }
-  function handleClick() {
-    const h = hitAt(mouseC, mouseR);
-    if (h && h.action) h.action();
+  return stored;
+}
+function saveIcons(){
+  try{ localStorage.setItem(ICONS_KEY, JSON.stringify(icons)); }catch(_){}
+}
+// note: icons populated after first resize() so cols/rows are known
+
+function appById(id){ return APPS.find(a=>a.id===id) }
+function iconAt(c, r){
+  for(let i=icons.length-1;i>=0;i--){
+    const ic = icons[i];
+    if(c>=ic.c && c<ic.c+ICON_W && r>=ic.r && r<ic.r+ICON_H) return ic;
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// WINDOWS — DOM-based window manager
+// ─────────────────────────────────────────────────────────────────────────
+let windows = []; // [{id, app, kind, el, titleEl, contentEl, instance?, x,y,w,h,z, closing}]
+let nextWinId = 1;
+let focusedWin = null;
+
+function focusWindow(win){
+  if(focusedWin===win) return;
+  if(focusedWin) focusedWin.el.classList.remove('focused');
+  focusedWin = win;
+  if(win){
+    win.el.classList.add('focused');
+    win.z = ++zTop;
+    win.el.style.zIndex = win.z;
+  }
+}
+
+function spawnWindow(app, opts={}){
+  const w = opts.w ?? Math.min(720, Math.floor(window.innerWidth*0.6));
+  const h = opts.h ?? Math.min(520, Math.floor(window.innerHeight*0.65));
+  const x = opts.x ?? Math.floor((window.innerWidth - w)/2 + (windows.length%5)*22);
+  const y = opts.y ?? Math.floor((window.innerHeight - h)/2 + (windows.length%5)*22);
+
+  const el = document.createElement('div');
+  el.className = 'win';
+  el.style.left = x+'px'; el.style.top = y+'px';
+  el.style.width = w+'px'; el.style.height = h+'px';
+  el.style.zIndex = ++zTop;
+
+  const titleEl = document.createElement('div');
+  titleEl.className = 'titlebar';
+  const glyph = document.createElement('span'); glyph.className='glyph'; glyph.textContent='▓';
+  const name = document.createElement('span'); name.className='name'; name.textContent = ' '+app.label+' '+(app.kind==='iframe'?'· '+app.src:'· '+app.id);
+  const minBtn = document.createElement('span'); minBtn.className='ctrl min'; minBtn.textContent='─';
+  const maxBtn = document.createElement('span'); maxBtn.className='ctrl max'; maxBtn.textContent='□';
+  const closeBtn = document.createElement('span'); closeBtn.className='ctrl close'; closeBtn.textContent='×';
+  titleEl.appendChild(glyph); titleEl.appendChild(name); titleEl.appendChild(minBtn); titleEl.appendChild(maxBtn); titleEl.appendChild(closeBtn);
+
+  const contentEl = document.createElement('div');
+  contentEl.className = 'content';
+
+  el.appendChild(titleEl);
+  el.appendChild(contentEl);
+
+  const resizer = document.createElement('div');
+  resizer.className = 'resizer';
+  resizer.textContent = '◢';
+  el.appendChild(resizer);
+
+  winLayer.appendChild(el);
+
+  const win = {
+    id: nextWinId++,
+    app, kind: app.kind,
+    el, titleEl, contentEl, resizer,
+    x, y, w, h, z: zTop,
+    instance: null, iframe: null,
+  };
+  windows.push(win);
+
+  // mount content
+  if(app.kind === 'iframe'){
+    const f = document.createElement('iframe');
+    f.src = app.src;
+    f.title = app.label;
+    contentEl.appendChild(f);
+    win.iframe = f;
+  } else if(app.kind === 'builtin'){
+    const c = document.createElement('canvas');
+    contentEl.appendChild(c);
+    win.canvasEl = c;
+    win.ctx = c.getContext('2d');
+    win.instance = app.factory();
+    win.instance.win = win;
+    win.instance.mount();
   }
 
-  function putChar(ch, c, r, color, alpha) {
-    if (c < 0 || r < 0 || c >= cols || r >= rows) return;
-    ctx.globalAlpha = alpha ?? 1;
-    ctx.fillStyle = color;
-    ctx.fillText(ch, c * cell + cell / 2, r * cell + (cell - Math.floor(cell * 1.02)) / 2 + 1);
+  // titlebar drag
+  titleEl.addEventListener('mousedown', (e)=>{
+    if(e.target===closeBtn || e.target===minBtn || e.target===maxBtn) return;
+    focusWindow(win);
+    titleEl.classList.add('dragging');
+    document.body.classList.add('dragging');
+    const ox = e.clientX - win.x, oy = e.clientY - win.y;
+    dragOp = { kind:'window', win, ox, oy };
+    e.preventDefault();
+  });
+
+  // resize drag
+  resizer.addEventListener('mousedown', (e)=>{
+    focusWindow(win);
+    document.body.classList.add('dragging');
+    const sw = win.w, sh = win.h, sx = e.clientX, sy = e.clientY;
+    dragOp = { kind:'resize', win, sw, sh, sx, sy };
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  // focus on click anywhere
+  el.addEventListener('mousedown', ()=>focusWindow(win), true);
+
+  closeBtn.addEventListener('click', (e)=>{ e.stopPropagation(); closeWindow(win); });
+  minBtn.addEventListener('click', (e)=>{ e.stopPropagation(); minimizeWindow(win); });
+  maxBtn.addEventListener('click', (e)=>{ e.stopPropagation(); toggleMax(win); });
+
+  // canvas size
+  if(win.canvasEl) sizeBuiltinCanvas(win);
+  focusWindow(win);
+  return win;
+}
+
+function sizeBuiltinCanvas(win){
+  // browser-style apps replace the standard canvas with their own layout;
+  // they manage their own sizing — just notify them and bail.
+  if(!win.canvasEl){
+    if(win.instance && win.instance.resize) win.instance.resize();
+    return;
+  }
+  const r = win.contentEl.getBoundingClientRect();
+  const w = Math.max(40, Math.floor(r.width));
+  const h = Math.max(40, Math.floor(r.height));
+  const dp = Math.max(1, Math.min(2, window.devicePixelRatio||1));
+  win.canvasEl.width = w*dp;
+  win.canvasEl.height = h*dp;
+  win.canvasEl.style.width = w+'px';
+  win.canvasEl.style.height = h+'px';
+  win.ctx.setTransform(dp,0,0,dp,0,0);
+  win.pixW = w; win.pixH = h;
+  if(win.instance && win.instance.resize) win.instance.resize();
+}
+
+function closeWindow(win){
+  if(win.instance && win.instance.destroy) win.instance.destroy();
+  win.el.remove();
+  windows = windows.filter(w=>w!==win);
+  if(focusedWin===win){
+    focusedWin = null;
+    const top = windows.reduce((a,b)=> (!a||b.z>a.z)?b:a, null);
+    if(top) focusWindow(top);
+  }
+}
+function minimizeWindow(win){
+  // simple: hide for a moment, restore on taskbar click
+  win.minimized = !win.minimized;
+  win.el.style.display = win.minimized ? 'none' : '';
+}
+function toggleMax(win){
+  if(!win.preMax){
+    win.preMax = {x:win.x,y:win.y,w:win.w,h:win.h};
+    win.x=4; win.y=4; win.w=window.innerWidth-8; win.h=window.innerHeight-cell*2-8;
+  } else {
+    Object.assign(win, win.preMax);
+    win.preMax = null;
+  }
+  applyWinRect(win);
+  if(win.canvasEl) sizeBuiltinCanvas(win);
+}
+function applyWinRect(win){
+  win.el.style.left = win.x+'px';
+  win.el.style.top = win.y+'px';
+  win.el.style.width = win.w+'px';
+  win.el.style.height = win.h+'px';
+}
+
+// global drag handlers
+window.addEventListener('mousemove', (e)=>{
+  mouseX = e.clientX; mouseY = e.clientY;
+  mouseC = Math.floor(mouseX/cell);
+  mouseR = Math.floor(mouseY/cell);
+  if(!dragOp) return;
+  if(dragOp.kind==='icon'){
+    dragOp.ic.c = Math.max(0, Math.min(cols-ICON_W, Math.floor(mouseX/cell) - dragOp.ox));
+    dragOp.ic.r = Math.max(0, Math.min(rows-ICON_H-2, Math.floor(mouseY/cell) - dragOp.oy));
+    dragOp.moved = dragOp.moved || (Math.abs(e.clientX-dragOp.startX)>4 || Math.abs(e.clientY-dragOp.startY)>4);
+  } else if(dragOp.kind==='window'){
+    dragOp.win.x = e.clientX - dragOp.ox;
+    dragOp.win.y = Math.max(0, e.clientY - dragOp.oy);
+    applyWinRect(dragOp.win);
+  } else if(dragOp.kind==='resize'){
+    dragOp.win.w = Math.max(160, dragOp.sw + (e.clientX - dragOp.sx));
+    dragOp.win.h = Math.max(120, dragOp.sh + (e.clientY - dragOp.sy));
+    applyWinRect(dragOp.win);
+    if(dragOp.win.canvasEl) sizeBuiltinCanvas(dragOp.win);
+  }
+});
+window.addEventListener('mouseup', (e)=>{
+  if(dragOp){
+    if(dragOp.kind==='icon'){
+      saveIcons();
+      // single-click open if didn't move
+      if(!dragOp.moved){
+        const app = appById(dragOp.ic.appId);
+        if(app) spawnWindow(app);
+      }
+    }
+    if(dragOp.kind==='window'){
+      dragOp.win.titleEl.classList.remove('dragging');
+    }
+    document.body.classList.remove('dragging');
+  }
+  dragOp = null;
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// CONTEXT MENU — canvas-rendered popup, in-universe
+// ─────────────────────────────────────────────────────────────────────────
+let ctxMenu = null; // {c, r, items: [{label, action, accent?, sep?}], hits: []}
+function openCtxMenu(px, py, items){
+  const c0 = Math.floor(px / cell);
+  const r0 = Math.floor(py / cell);
+  ctxMenu = { c: c0, r: r0, items, hits: [] };
+}
+function closeCtxMenu(){ ctxMenu = null }
+function drawCtxMenu(){
+  // clear popup canvas every frame (it's transparent)
+  pctx.clearRect(0,0,popups.width,popups.height);
+  if(!ctxMenu) return;
+  const m = ctxMenu;
+  let maxW = 4;
+  for(const it of m.items){
+    if(it.sep) continue;
+    maxW = Math.max(maxW, it.label.length + (it.shortcut ? it.shortcut.length+2 : 0) + 4);
+  }
+  const w = maxW + 4;
+  const h = m.items.length + 2;
+  let c0 = m.c, r0 = m.r;
+  if(c0 + w > cols) c0 = Math.max(0, cols - w);
+  if(r0 + h > rows-1) r0 = Math.max(0, rows-1 - h);
+  // shadow + body fill
+  pctx.fillStyle = '#000';
+  pctx.globalAlpha = 0.55;
+  pctx.fillRect((c0+1)*cell, (r0+1)*cell, w*cell, h*cell);
+  pctx.globalAlpha = 1;
+  pctx.fillStyle = PANEL;
+  pctx.fillRect(c0*cell, r0*cell, w*cell, h*cell);
+  // border
+  for(let cc=c0+1; cc<c0+w-1; cc++){ putPop.put('─', cc, r0, ACC, 0.85); putPop.put('─', cc, r0+h-1, ACC, 0.85); }
+  for(let rr=r0+1; rr<r0+h-1; rr++){ putPop.put('│', c0, rr, ACC, 0.85); putPop.put('│', c0+w-1, rr, ACC, 0.85); }
+  putPop.put('┌', c0, r0, ACC, 1);
+  putPop.put('┐', c0+w-1, r0, ACC, 1);
+  putPop.put('└', c0, r0+h-1, ACC, 1);
+  putPop.put('┘', c0+w-1, r0+h-1, ACC, 1);
+  m.hits = [];
+  m.bounds = {c0, r0, w, h};
+  for(let i=0; i<m.items.length; i++){
+    const it = m.items[i];
+    const r = r0 + 1 + i;
+    if(it.sep){
+      for(let cc=c0+1; cc<c0+w-1; cc++) putPop.put('─', cc, r, LOW, 0.5);
+      continue;
+    }
+    const hov = mouseR===r && mouseC>=c0+1 && mouseC<c0+w-1;
+    if(hov){
+      pctx.fillStyle = it.accent || HI;
+      pctx.globalAlpha = 0.18;
+      pctx.fillRect((c0+1)*cell, r*cell, (w-2)*cell, cell);
+      pctx.globalAlpha = 1;
+    }
+    const accent = it.accent || INK;
+    putPop.put(hov?'▶':'▸', c0+2, r, accent, hov?1:0.85);
+    putPop.text(it.label, c0+4, r, hov ? accent : INK, hov?1:0.92);
+    if(it.shortcut){
+      putPop.text(it.shortcut, c0+w-1-it.shortcut.length-1, r, MID, 0.7);
+    }
+    m.hits.push({c:c0+1, r, w:w-2, h:1, action:it.action});
+  }
+}
+// helper builders for common menus
+function desktopCtxItems(px, py){
+  return [
+    {label:'open START menu',  shortcut:'^S', accent:HI,   action:()=>{ startMenuOpen = true; }},
+    {label:'arrange icons',     accent:SUN,  action:()=>{ icons = defaultIconLayout(); saveIcons(); }},
+    {label:'shuffle wallpaper', accent:PHERO, action:()=>{ mycInit(); }},
+    {sep:true},
+    {label:'new program…',      accent:ACC,  action:()=>{ spawnWindow(appById('files')); }},
+    {label:'open browser',      accent:ACC,  action:()=>{ spawnWindow(appById('browser')); }},
+    {label:'open files',        accent:SUN,  action:()=>{ spawnWindow(appById('files')); }},
+    {sep:true},
+    {label:'about this OS…',    accent:VIO,  action:()=>{ spawnWindow(appById('about')); }},
+  ];
+}
+function iconCtxItems(ic){
+  const a = appById(ic.appId);
+  if(!a) return [];
+  return [
+    {label:'open '+a.label,     shortcut:'↵', accent:a.accent, action:()=>spawnWindow(a)},
+    {label:'open in new window', accent:a.accent2 || a.accent, action:()=>spawnWindow(a, {x: 60+windows.length*22, y: 60+windows.length*22})},
+    {sep:true},
+    {label:'reset position',     accent:SUN,  action:()=>{
+      const def = defaultIconLayout().find(d=>d.appId===ic.appId);
+      if(def){ ic.c = def.c; ic.r = def.r; saveIcons(); }
+    }},
+    {label:'remove from desktop',accent:WARN, action:()=>{
+      icons = icons.filter(i=>i!==ic); saveIcons();
+    }},
+    {sep:true},
+    {label:'properties…',        accent:ACC,  action:()=>{
+      // open browser to atlas with this app referenced
+      const w = spawnWindow(appById('browser'));
+      // navigate after a tick — instance may not be ready
+      setTimeout(()=>{ try{ w.instance.navigate('char://atlas') }catch(_){} }, 50);
+    }},
+  ];
+}
+function pillCtxItems(win){
+  return [
+    {label:win.minimized ? 'restore' : 'minimize', accent:SUN, action:()=>minimizeWindow(win)},
+    {label:'maximize', accent:LIM, action:()=>toggleMax(win)},
+    {label:'focus',    accent:ACC, action:()=>{ if(win.minimized){win.minimized=false; win.el.style.display='';} focusWindow(win); }},
+    {sep:true},
+    {label:'close',    accent:WARN, action:()=>closeWindow(win)},
+  ];
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BACKGROUND CANVAS — wallpaper + icons + taskbar + start menu
+// ─────────────────────────────────────────────────────────────────────────
+// ─── MYCELIUM WALLPAPER (subdued) ───────────────────────────────────────
+// tips walk a grid and deposit heat trails. kept dim & slow so the desktop
+// stays readable — color is a whisper, not a parade.
+const MYC_PALETTE = [PHERO, AQU, SKY, MID, LOW];
+const myc = {
+  cols:0, rows:0,
+  heat:null, hue:null, nutrient:null,
+  tips:[],
+  dirX:[1,0,-1,0,1,1,-1,-1],
+  dirY:[0,1,0,-1,1,-1,1,-1],
+};
+function mycInit(){
+  const n = cols*rows;
+  myc.cols = cols; myc.rows = rows;
+  myc.heat = new Float32Array(n);
+  myc.hue = new Uint8Array(n);
+  myc.nutrient = new Float32Array(n);
+  for(let i=0;i<n;i++) myc.nutrient[i] = 0.7 + 0.3*Math.random();
+  myc.tips = [];
+  // half as many seeds as before
+  const seedCount = Math.max(2, Math.floor(Math.min(cols,rows)/26));
+  for(let i=0;i<seedCount;i++) mycSpawn();
+}
+function mycSpawn(){
+  myc.tips.push({
+    c: Math.floor(Math.random()*cols),
+    r: Math.floor(Math.random()*rows),
+    energy: 0.5 + Math.random()*0.5,
+    hue: Math.floor(Math.random()*MYC_PALETTE.length),
+    drift: Math.floor(Math.random()*8),
+  });
+}
+function mycStep(){
+  if(!myc.heat || myc.cols!==cols || myc.rows!==rows) mycInit();
+  const n = cols*rows;
+  for(let i=0;i<n;i++){
+    myc.heat[i] *= 0.992;            // longer trails, gentler fade
+    myc.nutrient[i] = Math.min(1, myc.nutrient[i] + 0.002);
+  }
+  const newTips = [];
+  for(let ti=myc.tips.length-1; ti>=0; ti--){
+    const tip = myc.tips[ti];
+    if(tip.c<0||tip.c>=cols||tip.r<0||tip.r>=rows){ myc.tips.splice(ti,1); continue; }
+    const i = tip.r*cols + tip.c;
+    const nu = myc.nutrient[i];
+    // smaller heat deposits — caps around 0.4 in steady state
+    myc.heat[i] = Math.min(0.55, myc.heat[i] + 0.18 + 0.18*nu);
+    myc.hue[i] = tip.hue;
+    myc.nutrient[i] = Math.max(0, nu - 0.10);
+    let dirIdx = tip.drift;
+    if(Math.random()<0.30){
+      let bestW = -1, bestI = dirIdx;
+      for(let d=0; d<8; d++){
+        const nx = tip.c + myc.dirX[d], ny = tip.r + myc.dirY[d];
+        if(nx<0||nx>=cols||ny<0||ny>=rows) continue;
+        const w = myc.nutrient[ny*cols+nx] * (0.6 + Math.random()*0.8);
+        if(w>bestW){ bestW = w; bestI = d; }
+      }
+      dirIdx = bestI;
+    }
+    tip.drift = dirIdx;
+    tip.c += myc.dirX[dirIdx];
+    tip.r += myc.dirY[dirIdx];
+    // rarer branching, lower cap
+    if(Math.random() < 0.025 && myc.tips.length + newTips.length < 32){
+      const bd = Math.floor(Math.random()*8);
+      newTips.push({
+        c: tip.c + myc.dirX[bd], r: tip.r + myc.dirY[bd],
+        energy: tip.energy*0.6,
+        hue: tip.hue,
+        drift: bd,
+      });
+    }
+    tip.energy -= 0.003 + (1-nu)*0.008;
+    if(tip.energy<=0 || Math.random() < 0.003) myc.tips.splice(ti,1);
+  }
+  for(const nt of newTips) myc.tips.push(nt);
+  while(myc.tips.length < 2) mycSpawn();
+}
+function drawWallpaper(){
+  // step on every other frame — half the motion
+  if(t % 2 === 0) mycStep();
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const i = r*cols + c;
+      const h = myc.heat[i];
+      if(h < 0.05){
+        // very sparse cold noise — barely there
+        const hn = h2(c,r);
+        if(hn > 0.97){
+          const g = NOISE[Math.floor((hn*137 + t*0.005)%NOISE.length + NOISE.length)%NOISE.length];
+          putBg.put(g, c, r, DIM, 0.10);
+        }
+        continue;
+      }
+      const tier = Math.min(HEAT_GLYPH.length-1, Math.floor(h * 2 * HEAT_GLYPH.length));
+      const ch = HEAT_GLYPH[Math.min(HEAT_GLYPH.length-1, tier)];
+      const col = MYC_PALETTE[myc.hue[i] % MYC_PALETTE.length];
+      // alpha capped at 0.45 — never aggressive
+      putBg.put(ch, c, r, col, Math.min(0.45, h*1.2));
+    }
+  }
+}
+
+function drawIcon(ic){
+  const app = appById(ic.appId); if(!app) return;
+  const c0 = ic.c, r0 = ic.r;
+  const beingDragged = dragOp && dragOp.kind==='icon' && dragOp.ic===ic;
+  const hovered = !dragOp && mouseC>=c0 && mouseC<c0+ICON_W && mouseR>=r0 && mouseR<r0+ICON_H;
+  const a1 = app.accent || HI;
+  const a2 = app.accent2 || MID;
+  const al  = beingDragged ? 0.55 : 1;
+  // soft halo behind hovered icons — paint a translucent rect under the art rows
+  if(hovered){
+    ctx.fillStyle = a1;
+    ctx.globalAlpha = 0.08;
+    ctx.fillRect(c0*cell, r0*cell, ICON_W*cell, ICON_H*cell);
     ctx.globalAlpha = 1;
   }
-  function putText(s, c, r, color, alpha) {
-    for (let i = 0; i < s.length; i++) putChar(s[i], c + i, r, color, alpha);
+  // art
+  for(let i=0;i<3;i++){
+    const row = app.art[i] || '';
+    for(let j=0;j<ICON_W && j<row.length;j++){
+      const ch = row[j]; if(ch===' ') continue;
+      const fl = 0.82 + 0.18*Math.sin(t*0.06 + j*0.4 + i + (app.id.length));
+      // alternate primary/secondary so each icon has a 2-tone palette
+      const col = ((i+j)%2===0) ? a1 : a2;
+      const bright = hovered ? 1 : 0.9;
+      putBg.put(ch, c0+j, r0+i, col, al*fl*bright);
+    }
+  }
+  // label
+  const label = app.label;
+  const lc = c0 + Math.max(0, Math.floor((ICON_W - label.length)/2));
+  putBg.text(label, lc, r0+3, hovered ? a1 : INK, al);
+  // hover underline
+  if(hovered){
+    for(let j=0;j<ICON_W;j++) putBg.put('▔', c0+j, r0+4, a1, 0.55);
+  }
+}
+
+let taskbarStartHit=null, taskbarPills=[], taskbarClockHit=null;
+// rolling SORT-bar visualization for the status strip
+const SORT_BARS_N = 18;
+const sortBars = { arr: null, i: 0, j: 0 };
+function sortInit(){
+  sortBars.arr = new Array(SORT_BARS_N);
+  for(let i=0;i<SORT_BARS_N;i++) sortBars.arr[i] = Math.floor(Math.random()*7) + 1;
+  sortBars.i = 0; sortBars.j = 0;
+}
+function sortStep(){
+  if(!sortBars.arr) sortInit();
+  const a = sortBars.arr;
+  // single bubble-sort compare-swap per call
+  if(a[sortBars.j] > a[sortBars.j+1]){
+    const tmp = a[sortBars.j]; a[sortBars.j] = a[sortBars.j+1]; a[sortBars.j+1] = tmp;
+  }
+  sortBars.j++;
+  if(sortBars.j >= SORT_BARS_N - 1 - sortBars.i){
+    sortBars.j = 0; sortBars.i++;
+    if(sortBars.i >= SORT_BARS_N - 1){
+      // shuffle and start again — perpetual sort for the eye
+      for(let k=a.length-1;k>0;k--){
+        const r = Math.floor(Math.random()*(k+1));
+        [a[k], a[r]] = [a[r], a[k]];
+      }
+      sortBars.i = 0;
+    }
+  }
+}
+function drawSortBars(c0, r0){
+  if(!sortBars.arr) sortInit();
+  if(t%4===0) sortStep();
+  const a = sortBars.arr;
+  for(let i=0;i<a.length;i++){
+    const v = a[i];
+    const ch = '▁▂▃▄▅▆▇█'[Math.min(7, v)];
+    let col = MID;
+    if(i === sortBars.j) col = WARN;
+    else if(i === sortBars.j+1) col = CURSOR;
+    else col = RAINBOW[(i + Math.floor(t/8)) % RAINBOW.length];
+    putBg.put(ch, c0+i, r0, col, 0.9);
+  }
+}
+function drawTaskbar(){
+  const r0 = rows-1;
+  // panel band — solid dark fill across the whole row + 1px above
+  ctx.fillStyle = PANEL;
+  ctx.fillRect(0, (r0-1)*cell + cell*0.3, cv_w(), cell*1.7);
+  // top edge of taskbar
+  for(let c=0;c<cols;c++) putBg.put('─', c, r0-1, LOW, 0.7);
+
+  // start button — colored gradient
+  const startLbl = startMenuOpen ? '▼ START ' : '▶ START ';
+  for(let i=0;i<startLbl.length;i++){
+    const col = startMenuOpen ? CURSOR : RAINBOW[(i + Math.floor(t/12)) % RAINBOW.length];
+    putBg.put(startLbl[i], 1+i, r0, col, 1);
+  }
+  taskbarStartHit = {c:1, r:r0, w:startLbl.length, h:1};
+  // separator
+  putBg.put('│', 1+startLbl.length, r0, LOW, 0.7);
+
+  // running window pills, tinted by their app accent
+  taskbarPills = [];
+  let pc = 1+startLbl.length+2;
+  for(const win of windows){
+    const lbl = (win.minimized?'▭ ':'▣ ') + win.app.label;
+    const pillW = lbl.length + 2;
+    if(pc + pillW > cols - 30) break;
+    const isFocus = focusedWin===win;
+    const hov = mouseR===r0 && mouseC>=pc && mouseC<pc+pillW;
+    const ac = win.app.accent || HI;
+    const col = isFocus ? ac : (hov ? ac : MID);
+    const a   = isFocus ? 1 : (hov ? 0.95 : 0.7);
+    putBg.put('[', pc, r0, col, a);
+    putBg.text(lbl, pc+1, r0, isFocus ? INK : col, a);
+    putBg.put(']', pc+pillW-1, r0, col, a);
+    if(isFocus){
+      // little focus dot pulse to the right of the bracket
+      putBg.put('•', pc+pillW, r0, ac, 0.6+0.4*Math.sin(t*0.18));
+    }
+    taskbarPills.push({c:pc, r:r0, w:pillW, h:1, win});
+    pc += pillW + 1;
   }
 
-  // seeded hash
-  function h2(x, y) {
-    let n = (x * 374761393 + y * 668265263) ^ 0x27d4eb2d;
-    n = (n ^ (n >>> 15)) * 2246822519;
-    n = (n ^ (n >>> 13)) * 3266489917;
-    return ((n ^ (n >>> 16)) >>> 0) / 0xffffffff;
+  // RIGHT side: SORT mini-bars · MEM bar · clock
+  const time = clockStr();
+  const memSlots = 6;
+  const totalRight = SORT_BARS_N + 2 + 4 + memSlots + 2 + time.length + 2;
+  let sc = cols - totalRight - 1;
+  // SORT bars
+  drawSortBars(sc, r0);
+  sc += SORT_BARS_N + 2;
+  // MEM
+  putBg.text('MEM ', sc, r0, MID, 0.85);
+  const memFill = Math.floor(memSlots*(0.55 + 0.25*Math.sin(t*0.013) + 0.1*Math.sin(t*0.07)));
+  for(let i=0;i<memSlots;i++){
+    const filled = i<memFill;
+    const col = !filled ? DIM : (i>4?WARN : i>2 ? CURSOR : HI);
+    putBg.put(filled?'▓':'░', sc+4+i, r0, col, 0.9);
   }
+  sc += 4 + memSlots + 2;
+  // clock
+  putBg.text(time, sc, r0, CURSOR, 1);
+  taskbarClockHit = {c:sc, r:r0, w:time.length, h:1};
+}
+function cv_w(){ return bg.width / dpr }
 
-  // ── background: sparse glyph field, the "vacuum" of the OS ──
-  function drawBackground() {
-    const phase = t * 0.004;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const hn = h2(c, r);
-        const wave = 0.5 + 0.5 * Math.sin(phase + c * 0.09 - r * 0.11 + hn * 6.28);
-        const d = wave * (0.32 + hn * 0.42);
-        if (d < 0.58) continue;
-        const g = NOISE[Math.floor((hn * 137 + t * 0.02) % NOISE.length + NOISE.length) % NOISE.length];
-        const col = d > 0.88 ? LOW : DIM;
-        putChar(g, c, r, col, d > 0.88 ? 0.45 : 0.30);
+let startMenuHits=[];
+function drawStartMenu(){
+  if(!startMenuOpen){ startMenuHits=[]; return; }
+  const w = 24, h = APPS.length + 6;
+  const c0 = 1, r0 = Math.max(2, rows - 1 - h);
+  // wipe area with solid bg (and a 1-cell drop shadow tint to the right/below)
+  ctx.fillStyle = '#000';
+  ctx.globalAlpha = 0.55;
+  ctx.fillRect((c0+1)*cell, (r0+1)*cell, w*cell, h*cell);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = BG;
+  ctx.fillRect(c0*cell, r0*cell, w*cell, h*cell);
+  // border
+  for(let c=c0+1;c<c0+w-1;c++){ putBg.put('═', c, r0, MID, 0.95); putBg.put('═', c, r0+h-1, MID, 0.95); }
+  for(let r=r0+1;r<r0+h-1;r++){ putBg.put('║', c0, r, MID, 0.95); putBg.put('║', c0+w-1, r, MID, 0.95); }
+  putBg.put('╔', c0, r0, MID, 1); putBg.put('╗', c0+w-1, r0, MID, 1);
+  putBg.put('╚', c0, r0+h-1, MID, 1); putBg.put('╝', c0+w-1, r0+h-1, MID, 1);
+
+  // header — multi-color title
+  const title = ' CHARACTERWORLD/OS';
+  for(let i=0;i<title.length;i++){
+    const col = title[i]===' ' ? INK : RAINBOW[(i + Math.floor(t/14)) % RAINBOW.length];
+    putBg.put(title[i], c0+2+i, r0+1, col, 1);
+  }
+  // separator
+  for(let c=c0+1;c<c0+w-1;c++) putBg.put('─', c, r0+2, LOW, 0.7);
+
+  startMenuHits = [];
+  let r = r0+3;
+  const prog = APPS.filter(a=>a.kind==='iframe');
+  const tools = APPS.filter(a=>a.kind==='builtin' && a.id!=='about');
+  const sys   = APPS.filter(a=>a.id==='about');
+
+  function drawGroup(title, list, headerCol){
+    putBg.text(title, c0+2, r, headerCol, 0.85);
+    r++;
+    for(const a of list){
+      const hov = mouseR===r && mouseC>=c0+1 && mouseC<c0+w-1;
+      const ac = a.accent || HI;
+      // glyph dot in app's accent color, then white-ish label
+      putBg.put(hov?'▶':'▸', c0+2, r, ac, hov?1:0.85);
+      const lbl = a.label.padEnd(w-6,' ');
+      putBg.text(lbl, c0+4, r, hov ? ac : INK, hov?1:0.9);
+      startMenuHits.push({c:c0+1, r, w:w-2, h:1, app:a});
+      r++;
+    }
+    r++;
+  }
+  drawGroup('— programs —', prog, ACC);
+  drawGroup('— accessories —', tools, SUN);
+  drawGroup('— system —', sys, VIO);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BACKGROUND INPUT (wallpaper-level: icons + taskbar + start menu)
+// ─────────────────────────────────────────────────────────────────────────
+bg.addEventListener('mousedown', (e)=>{
+  const c = Math.floor(e.clientX/cell), r = Math.floor(e.clientY/cell);
+  const right = e.button === 2;
+  // context menu open? a left or right click anywhere on bg either selects an item or dismisses
+  if(ctxMenu){
+    for(const hit of ctxMenu.hits){
+      if(c>=hit.c && c<hit.c+hit.w && r>=hit.r && r<hit.r+hit.h){
+        const a = hit.action;
+        closeCtxMenu();
+        if(a) a();
+        return;
       }
     }
-    // very faint scanlines
-    for (let r = 0; r < rows; r += 3) {
-      for (let c = 0; c < cols; c++) putChar('·', c, r, DIM, 0.05);
+    closeCtxMenu();
+    if(!right) return;
+  }
+  if(right){
+    // right-click routing
+    if(taskbarStartHit){
+      const h = taskbarStartHit;
+      if(c>=h.c && c<h.c+h.w && r>=h.r && r<h.r+h.h){ openCtxMenu(e.clientX, e.clientY, [
+        {label:'OS · about',     accent:VIO, action:()=>spawnWindow(appById('about'))},
+        {label:'shuffle desktop',accent:PHERO, action:()=>{ mycInit(); icons = defaultIconLayout(); saveIcons(); }},
+        {sep:true},
+        {label:'reload page',    accent:WARN, action:()=>location.reload()},
+      ]); return; }
     }
-  }
-
-  // ── outer chrome: double-line border like a CRT bezel ──
-  function drawOuterFrame() {
-    const x0 = 0, y0 = 0, x1 = cols - 1, y1 = rows - 1;
-    for (let c = x0 + 1; c < x1; c++) { putChar('═', c, y0, MID, 0.85); putChar('═', c, y1, MID, 0.85); }
-    for (let r = y0 + 1; r < y1; r++) { putChar('║', x0, r, MID, 0.85); putChar('║', x1, r, MID, 0.85); }
-    putChar('╔', x0, y0, MID, 0.95); putChar('╗', x1, y0, MID, 0.95);
-    putChar('╚', x0, y1, MID, 0.95); putChar('╝', x1, y1, MID, 0.95);
-
-    // separator under menu bar
-    const menuSep = 2;
-    for (let c = x0 + 1; c < x1; c++) putChar('─', c, menuSep, LOW, 0.7);
-    putChar('╟', x0, menuSep, MID, 0.85); putChar('╢', x1, menuSep, MID, 0.85);
-
-    // separator above status bar
-    const statSep = y1 - 2;
-    for (let c = x0 + 1; c < x1; c++) putChar('─', c, statSep, LOW, 0.7);
-    putChar('╟', x0, statSep, MID, 0.85); putChar('╢', x1, statSep, MID, 0.85);
-
-    return { x0, y0, x1, y1, menuSep, statSep };
-  }
-
-  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
-  function clockStr() {
-    const d = new Date();
-    return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
-  }
-
-  // ── menu bar: title left, menus middle, clock right ──
-  function drawMenuBar(box) {
-    const r = 1;
-    // title
-    const title = ' CHARACTERWORLD/OS ';
-    putText(title, box.x0 + 2, r, ACCENT, 1);
-    // version mark
-    putText(' v0.5 ', box.x0 + 2 + title.length, r, MID, 0.85);
-
-    // menus
-    const menus = [' FILE ', ' RUN ', ' VIEW ', ' HELP '];
-    let mc = box.x0 + 2 + title.length + 8;
-    const totalMenus = menus.reduce((a, s) => a + s.length, 0);
-    if (mc + totalMenus < box.x1 - 14) {
-      for (const m of menus) {
-        const hovered = mouseR === r && mouseC >= mc && mouseC < mc + m.length;
-        putText(m, mc, r, hovered ? ACCENT : HI, hovered ? 1 : 0.85);
-        if (hovered) addHit(mc, r, m.length, 1, () => {});
-        mc += m.length + 1;
+    for(const p of taskbarPills){
+      if(c>=p.c && c<p.c+p.w && r>=p.r && r<p.r+p.h){
+        openCtxMenu(e.clientX, e.clientY, pillCtxItems(p.win));
+        return;
       }
     }
-
-    // clock + corner accent
-    const cs = clockStr();
-    const dateStr = '2026·' + cs;
-    putText(dateStr, box.x1 - dateStr.length - 2, r, MID, 0.9);
-    putChar('⌖', box.x1 - 1, r, ACCENT, 0.9 + 0.1 * Math.sin(t * 0.1));
-  }
-
-  // ── prompt line below the menu bar ──
-  function drawPrompt(box) {
-    const r = box.menuSep + 2;
-    const txt = 'C:\\CHARACTERWORLD\\>';
-    putText(txt, box.x0 + 3, r, HI, 0.95);
-    // blinking cursor
-    const blink = Math.floor(t / 30) % 2 === 0;
-    putChar(blink ? '█' : '▒', box.x0 + 3 + txt.length + 1, r, ACCENT, blink ? 0.95 : 0.5);
-    // boot-tag right side
-    const stamp = 'READY · 6 PROGRAMS · ' + ENTRIES.filter(e => e.live).length + ' LIVE';
-    if (box.x1 - stamp.length - 3 > box.x0 + 3 + txt.length + 8) {
-      putText(stamp, box.x1 - stamp.length - 3, r, MID, 0.7);
-    }
-  }
-
-  // ── program tile ──
-  // 22 wide × 5 tall window
-  const TW = 22, TH = 5;
-  function drawTile(e, c0, r0, idx) {
-    const hovered = mouseC >= c0 && mouseC < c0 + TW && mouseR >= r0 && mouseR < r0 + TH && e.live;
-    const focusCol = hovered ? ACCENT : (e.live ? MID : LOW);
-    const titleCol = hovered ? ACCENT : (e.live ? HI : LOW);
-    const innerCol = e.live ? (hovered ? HI : MID) : LOW;
-    const al = e.live ? 1 : 0.55;
-
-    // top border with embedded title  ┌─[ 01 ATELIER  ]──┐
-    const titleStr = '[ ' + e.id + ' ' + e.name.padEnd(7, ' ') + ']';
-    const top = '┌─' + titleStr + '─'.repeat(Math.max(0, TW - 4 - titleStr.length)) + '┐';
-    for (let i = 0; i < TW; i++) {
-      const ch = top[i] || ' ';
-      const isTitleChar = i >= 2 && i < 2 + titleStr.length;
-      putChar(ch, c0 + i, r0, isTitleChar ? titleCol : focusCol, al);
-    }
-
-    // sides
-    putChar('│', c0, r0 + 1, focusCol, al);
-    putChar('│', c0 + TW - 1, r0 + 1, focusCol, al);
-    putChar('│', c0, r0 + 2, focusCol, al);
-    putChar('│', c0 + TW - 1, r0 + 2, focusCol, al);
-    putChar('│', c0, r0 + 3, focusCol, al);
-    putChar('│', c0 + TW - 1, r0 + 3, focusCol, al);
-
-    // icon rows (centered in inner width = TW-4)
-    const innerW = TW - 4;
-    const ic0 = c0 + 2 + Math.max(0, Math.floor((innerW - 12) / 2));
-    const a1 = e.live ? (hovered ? 1 : 0.9) : 0.45;
-    const iconCol1 = e.live ? (hovered ? ACCENT : HI) : LOW;
-    const iconCol2 = e.live ? (hovered ? HI : MID) : LOW;
-    // subtle per-frame jitter so icons feel alive
-    const flicker = (i) => 0.88 + 0.12 * Math.sin(t * 0.07 + idx + i * 0.4);
-    for (let i = 0; i < 12; i++) {
-      const ch1 = e.icon[0][i] || ' ';
-      const ch2 = e.icon[1][i] || ' ';
-      putChar(ch1, ic0 + i, r0 + 1, iconCol1, a1 * flicker(i));
-      putChar(ch2, ic0 + i, r0 + 2, iconCol2, a1 * flicker(i + 7));
-    }
-
-    // tag line, centered
-    const tagW = Math.min(e.tag.length, innerW);
-    const tc0 = c0 + 2 + Math.max(0, Math.floor((innerW - tagW) / 2));
-    putText(e.tag.slice(0, tagW), tc0, r0 + 3, innerCol, al);
-
-    // bottom border with action  └─[ ↵ RUN ]───────┘
-    let action;
-    if (e.live) action = hovered ? '[ ↵ RUN ]' : '[   RUN   ]';
-    else action = '( queued  )';
-    const bot = '└─' + action + '─'.repeat(Math.max(0, TW - 4 - action.length)) + '┘';
-    for (let i = 0; i < TW; i++) {
-      const ch = bot[i] || ' ';
-      const isAction = i >= 2 && i < 2 + action.length;
-      const col = isAction ? (hovered ? ACCENT : (e.live ? HI : LOW)) : focusCol;
-      const a  = isAction && hovered ? (0.7 + 0.3 * Math.sin(t * 0.18)) : al;
-      putChar(ch, c0 + i, r0 + TH - 1, col, a);
-    }
-
-    if (e.live && e.href) {
-      addHit(c0, r0, TW, TH, () => { window.location.href = e.href; });
-    }
-  }
-
-  function drawDesktop(box) {
-    const startR = box.menuSep + 4;
-    const endR = box.statSep - 2;
-    const availW = box.x1 - box.x0 - 4;
-    const availH = endR - startR;
-
-    const gapX = 2, gapY = 1;
-    const tilesPerRow = Math.max(1, Math.min(ENTRIES.length, Math.floor((availW + gapX) / (TW + gapX))));
-    const totalRows = Math.ceil(ENTRIES.length / tilesPerRow);
-    const gridH = totalRows * TH + (totalRows - 1) * gapY;
-    const gridW = tilesPerRow * TW + (tilesPerRow - 1) * gapX;
-    const gridC0 = box.x0 + 2 + Math.max(0, Math.floor((availW - gridW) / 2));
-    const gridR0 = startR + Math.max(0, Math.floor((availH - gridH) / 2));
-
-    ENTRIES.forEach((e, i) => {
-      const tr = Math.floor(i / tilesPerRow);
-      const tc = i % tilesPerRow;
-      const c0 = gridC0 + tc * (TW + gapX);
-      const r0 = gridR0 + tr * (TH + gapY);
-      drawTile(e, c0, r0, i);
-    });
-  }
-
-  // ── status bar at bottom ──
-  function drawStatusBar(box) {
-    const r = box.y1 - 1;
-
-    // function keys
-    const keys = [
-      { k: 'F1', label: 'HELP', action: () => window.open('https://github.com/willbearfruits/characterworld', '_blank') },
-      { k: 'F2', label: 'PAINT', action: () => location.href = 'charactershop/' },
-      { k: 'F3', label: 'FILM', action: () => location.href = 'characterfilm/' },
-      { k: 'F4', label: 'GRAIN', action: () => location.href = 'charactergrain/' },
-      { k: 'F5', label: 'TRACK', action: () => location.href = 'charactertracker/' },
-      { k: 'F6', label: 'DELVE', action: () => location.href = 'characterdelve/' },
-    ];
-    let cx = box.x0 + 2;
-    for (const fk of keys) {
-      const seg = fk.k + ' ' + fk.label;
-      if (cx + seg.length + 2 > box.x1 - 22) break;
-      const hovered = mouseR === r && mouseC >= cx && mouseC < cx + seg.length;
-      putText(fk.k, cx, r, hovered ? ACCENT : ACCENT, hovered ? 1 : 0.9);
-      putText(' ' + fk.label, cx + 2, r, hovered ? ACCENT : HI, hovered ? 1 : 0.85);
-      addHit(cx, r, seg.length, 1, fk.action);
-      cx += seg.length + 2;
-    }
-
-    // right side: MEM bar + glyph rate (decorative)
-    const memSlots = 8;
-    const memFill = Math.floor(memSlots * (0.55 + 0.25 * Math.sin(t * 0.013) + 0.1 * Math.sin(t * 0.07)));
-    let memBar = '';
-    for (let i = 0; i < memSlots; i++) memBar += i < memFill ? '▓' : '░';
-    const rate = 1800 + Math.floor(600 * (0.5 + 0.5 * Math.sin(t * 0.019)));
-    const right = 'MEM ' + memBar + ' · ' + rate + ' glyph/s';
-    if (box.x1 - right.length - 2 > cx + 2) {
-      // MEM label
-      putText('MEM ', box.x1 - right.length - 2, r, MID, 0.85);
-      // bar with color split
-      for (let i = 0; i < memSlots; i++) {
-        const col = i < memFill ? (i > 5 ? WARM : HI) : DIM;
-        putChar(memBar[i], box.x1 - right.length - 2 + 4 + i, r, col, 0.9);
-      }
-      putText(' · ' + rate + ' glyph/s', box.x1 - right.length - 2 + 4 + memSlots, r, MID, 0.85);
-    }
-  }
-
-  // ── cursor ──
-  function drawCursor() {
-    if (mouseC < 0 || mouseR < 0) return;
-    const h = hitAt(mouseC, mouseR);
-    const mark = h ? '◈' : '+';
-    const color = h ? ACCENT : HI;
-    const alpha = 0.7 + 0.3 * Math.sin(t * 0.2);
-    putChar(mark, mouseC, mouseR, color, alpha);
-  }
-
-  function render() {
-    t++;
-    ctx.fillStyle = BG;
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    hits = [];
-
-    drawBackground();
-    const box = drawOuterFrame();
-    drawMenuBar(box);
-    drawPrompt(box);
-    drawDesktop(box);
-    drawStatusBar(box);
-    drawCursor();
-
-    requestAnimationFrame(render);
-  }
-  render();
-
-  // keyboard shortcuts
-  window.addEventListener('keydown', (e) => {
-    const map = {
-      '1': 'charactershop/',
-      '2': 'characterfilm/',
-      '3': 'charactergrain/',
-      '4': 'charactertracker/',
-      '5': 'characterdelve/',
-    };
-    const fmap = {
-      'F1': 'github',
-      'F2': 'charactershop/',
-      'F3': 'characterfilm/',
-      'F4': 'charactergrain/',
-      'F5': 'charactertracker/',
-      'F6': 'characterdelve/',
-    };
-    if (map[e.key]) { window.location.href = map[e.key]; return; }
-    if (fmap[e.key]) {
-      e.preventDefault();
-      if (fmap[e.key] === 'github') window.open('https://github.com/willbearfruits/characterworld', '_blank');
-      else window.location.href = fmap[e.key];
+    const ic = iconAt(c, r);
+    if(ic){
+      openCtxMenu(e.clientX, e.clientY, iconCtxItems(ic));
       return;
     }
-    if (e.key === 'g' || e.key === 'G') window.open('https://github.com/willbearfruits/characterworld', '_blank');
-  });
+    // empty desktop right-click
+    openCtxMenu(e.clientX, e.clientY, desktopCtxItems(e.clientX, e.clientY));
+    return;
+  }
+  // ── left-click handling ──
+  if(startMenuOpen){
+    for(const hit of startMenuHits){
+      if(c>=hit.c && c<hit.c+hit.w && r>=hit.r && r<hit.r+hit.h){
+        startMenuOpen = false;
+        spawnWindow(hit.app);
+        return;
+      }
+    }
+    startMenuOpen = false;
+    return;
+  }
+  if(taskbarStartHit){
+    const h = taskbarStartHit;
+    if(c>=h.c && c<h.c+h.w && r>=h.r && r<h.r+h.h){ startMenuOpen = true; return; }
+  }
+  for(const p of taskbarPills){
+    if(c>=p.c && c<p.c+p.w && r>=p.r && r<p.r+p.h){
+      if(p.win.minimized){ p.win.minimized=false; p.win.el.style.display=''; }
+      focusWindow(p.win);
+      return;
+    }
+  }
+  const ic = iconAt(c, r);
+  if(ic){
+    dragOp = { kind:'icon', ic, ox: c-ic.c, oy: r-ic.r,
+               startX: e.clientX, startY: e.clientY, moved:false };
+    return;
+  }
+  startMenuOpen = false;
+});
+// suppress native context menu over bg + windows so our in-universe one shows
+window.addEventListener('contextmenu', (e)=>{ e.preventDefault(); });
+// global capture-phase mousedown — when a menu is open, route the click
+// to a menu item or close the menu. swallow the event so underlying
+// elements (windows, icons) don't also receive it.
+document.addEventListener('mousedown', (e)=>{
+  if(!ctxMenu) return;
+  const c = Math.floor(e.clientX/cell), r = Math.floor(e.clientY/cell);
+  if(e.button === 2){
+    // right-click while menu open: close current and let the new right-click open another
+    closeCtxMenu();
+    return;
+  }
+  for(const hit of ctxMenu.hits){
+    if(c>=hit.c && c<hit.c+hit.w && r>=hit.r && r<hit.r+hit.h){
+      const a = hit.action;
+      closeCtxMenu();
+      if(a) a();
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+  }
+  // click outside the menu: just close
+  closeCtxMenu();
+  e.preventDefault();
+  e.stopPropagation();
+}, true);
+// right-click on a window's title bar
+document.addEventListener('mousedown', (e)=>{
+  if(e.button !== 2) return;
+  // hit-test windows from top z
+  for(let i=windows.length-1; i>=0; i--){
+    const w = windows[i];
+    if(w.minimized) continue;
+    const rb = w.titleEl.getBoundingClientRect();
+    if(e.clientX>=rb.left && e.clientX<=rb.right && e.clientY>=rb.top && e.clientY<=rb.bottom){
+      openCtxMenu(e.clientX, e.clientY, [
+        {label:'focus',    accent:ACC, action:()=>focusWindow(w)},
+        {label:w.minimized ? 'restore' : 'minimize', accent:SUN, action:()=>minimizeWindow(w)},
+        {label:'maximize', accent:LIM, action:()=>toggleMax(w)},
+        {sep:true},
+        {label:'close',    accent:WARN, action:()=>closeWindow(w)},
+      ]);
+      e.preventDefault();
+      return;
+    }
+  }
+}, true);
+
+// ─────────────────────────────────────────────────────────────────────────
+// KEYBOARD — global shortcuts + route to focused builtin
+// ─────────────────────────────────────────────────────────────────────────
+window.addEventListener('keydown', (e)=>{
+  // route to focused builtin first
+  if(focusedWin && focusedWin.kind==='builtin' && focusedWin.instance && focusedWin.instance.onKey){
+    if(focusedWin.instance.onKey(e)) return;
+  }
+  if(e.key==='Escape'){ startMenuOpen=false; closeCtxMenu(); return; }
+  if(e.key==='F1'){ e.preventDefault(); window.open('https://github.com/willbearfruits/characterworld','_blank'); return; }
+  const numMap = {'1':'atelier','2':'film','3':'grain','4':'tracker','5':'delve','6':'browser','7':'files','8':'calc','9':'snake','0':'sort'};
+  if(numMap[e.key] && (e.metaKey || e.ctrlKey)){
+    const a = appById(numMap[e.key]);
+    if(a){ e.preventDefault(); spawnWindow(a); }
+  }
+  if(e.key==='s' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); startMenuOpen = !startMenuOpen; }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// BUILT-IN APP: CALCULATOR
+// ─────────────────────────────────────────────────────────────────────────
+class Calculator {
+  constructor(){
+    this.display='0'; this.prev=null; this.op=null; this.justOp=false;
+    this.flash=0;
+    // 4×5 keypad
+    this.keys = [
+      ['C','±','%','÷'],
+      ['7','8','9','×'],
+      ['4','5','6','−'],
+      ['1','2','3','+'],
+      ['0','0','.','='],
+    ];
+    this.keyHits=[];
+  }
+  mount(){
+    this.win.canvasEl.addEventListener('mousedown', (e)=>this._onClick(e));
+  }
+  resize(){ /* nothing per-frame */ }
+  _onClick(e){
+    const r = this.win.canvasEl.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    for(const h of this.keyHits){
+      if(x>=h.x && x<h.x+h.w && y>=h.y && y<h.y+h.h){
+        this.press(h.label);
+        this.flash = 8;
+        return;
+      }
+    }
+  }
+  onKey(e){
+    if(e.key>='0' && e.key<='9'){ this.press(e.key); return true; }
+    if(e.key==='.') { this.press('.'); return true; }
+    if(e.key==='+'||e.key==='-'||e.key==='*'||e.key==='/'){
+      this.press(e.key==='+'?'+':e.key==='-'?'−':e.key==='*'?'×':'÷'); return true;
+    }
+    if(e.key==='Enter'||e.key==='='){ this.press('='); return true; }
+    if(e.key==='Escape'){ this.press('C'); return true; }
+    if(e.key==='Backspace'){
+      this.display = this.display.length>1 ? this.display.slice(0,-1) : '0';
+      return true;
+    }
+    return false;
+  }
+  press(k){
+    if(/^[0-9]$/.test(k)){
+      if(this.justOp){ this.display=k; this.justOp=false; }
+      else this.display = this.display==='0' ? k : this.display+k;
+    } else if(k==='.'){
+      if(!this.display.includes('.')) this.display += '.';
+    } else if(k==='C'){ this.display='0'; this.prev=null; this.op=null; }
+    else if(k==='±'){ this.display = this.display.startsWith('-') ? this.display.slice(1) : '-'+this.display; }
+    else if(k==='%'){ this.display = String(parseFloat(this.display)/100); }
+    else if(k==='+'||k==='−'||k==='×'||k==='÷'){
+      if(this.prev!=null && this.op && !this.justOp) this._compute();
+      else this.prev = parseFloat(this.display);
+      this.op = k; this.justOp = true;
+    } else if(k==='='){
+      if(this.op!=null) this._compute();
+      this.op = null; this.justOp = true;
+    }
+  }
+  _compute(){
+    const a = this.prev, b = parseFloat(this.display);
+    let r = 0;
+    switch(this.op){
+      case '+': r=a+b; break; case '−': r=a-b; break;
+      case '×': r=a*b; break; case '÷': r = b===0 ? NaN : a/b; break;
+    }
+    this.display = isNaN(r) ? 'ERR' : (Math.round(r*1e8)/1e8).toString();
+    this.prev = isNaN(r) ? null : r;
+  }
+  draw(){
+    const c = this.win.ctx;
+    const W = this.win.pixW, H = this.win.pixH;
+    c.fillStyle = BG; c.fillRect(0,0,W,H);
+    const cs = Math.max(10, Math.floor(Math.min(W/26, H/14)));
+    const put = makePut(c, cs);
+    const cols = Math.floor(W/cs), rows = Math.floor(H/cs);
+    // border
+    for(let cc=1;cc<cols-1;cc++){ put.put('═', cc, 0, MID, 0.85); put.put('═', cc, rows-1, MID, 0.85); }
+    for(let rr=1;rr<rows-1;rr++){ put.put('║', 0, rr, MID, 0.85); put.put('║', cols-1, rr, MID, 0.85); }
+    put.put('╔',0,0,MID,1); put.put('╗',cols-1,0,MID,1); put.put('╚',0,rows-1,MID,1); put.put('╝',cols-1,rows-1,MID,1);
+
+    // display
+    const dispR = 2;
+    const txt = this.display.slice(-Math.max(8, cols-6));
+    put.text(' '+txt.padStart(cols-4,' ')+' ', 2, dispR, this.flash>0?ACCENT:HI, 1);
+    if(this.flash>0) this.flash--;
+    // op indicator
+    if(this.op) put.put(this.op, 2, dispR, ACCENT, 0.9);
+
+    // keypad
+    const startR = 4;
+    const padH = rows - startR - 2;
+    const padW = cols - 4;
+    const cellW = Math.max(3, Math.floor(padW/4));
+    const cellH = Math.max(2, Math.floor(padH/5));
+    this.keyHits = [];
+    for(let row=0; row<5; row++){
+      for(let col=0; col<4; col++){
+        const k = this.keys[row][col];
+        // skip duplicate '0' second-cell to make a wide 0
+        if(row===4 && col===1 && this.keys[row][0]===this.keys[row][1]) continue;
+        const span = (row===4 && col===0) ? 2 : 1;
+        const x = 2 + col*cellW;
+        const y = startR + row*cellH;
+        const w = cellW*span;
+        // draw key box
+        const isOp = '÷×−+='.includes(k);
+        const isFn = 'C±%'.includes(k);
+        const col1 = isOp ? ACCENT : isFn ? WARM : HI;
+        for(let cc=0;cc<w;cc++){ put.put('─', x+cc, y, LOW, 0.6); put.put('─', x+cc, y+cellH-1, LOW, 0.6); }
+        for(let rr=0;rr<cellH;rr++){ put.put('│', x, y+rr, LOW, 0.6); put.put('│', x+w-1, y+rr, LOW, 0.6); }
+        put.put('┌',x,y,LOW,0.7); put.put('┐',x+w-1,y,LOW,0.7);
+        put.put('└',x,y+cellH-1,LOW,0.7); put.put('┘',x+w-1,y+cellH-1,LOW,0.7);
+        // label centered
+        const lc = x + Math.floor(w/2);
+        const lr = y + Math.floor(cellH/2);
+        put.put(k, lc, lr, col1, 0.95);
+        // hit-rect in pixels
+        this.keyHits.push({ x:x*cs, y:y*cs, w:w*cs, h:cellH*cs, label:k });
+      }
+    }
+  }
+  destroy(){}
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BUILT-IN APP: SNAKE
+// ─────────────────────────────────────────────────────────────────────────
+class Snake {
+  constructor(){
+    this.gw = 22; this.gh = 14;
+    this.reset();
+    this.tickAccum = 0;
+    this.speed = 8;
+  }
+  reset(){
+    this.snake = [{c:Math.floor(this.gw/2), r:Math.floor(this.gh/2)}];
+    this.dir = {c:1, r:0};
+    this.queueDir = null;
+    this.dead = false;
+    this.score = 0;
+    this.placeFood();
+  }
+  placeFood(){
+    let tries=0;
+    while(tries++<200){
+      const c = 1+Math.floor(Math.random()*(this.gw-2));
+      const r = 1+Math.floor(Math.random()*(this.gh-2));
+      if(!this.snake.some(s=>s.c===c&&s.r===r)){ this.food={c,r}; return; }
+    }
+    this.food = {c:1,r:1};
+  }
+  mount(){}
+  resize(){}
+  onKey(e){
+    const m = {'ArrowUp':{c:0,r:-1},'ArrowDown':{c:0,r:1},'ArrowLeft':{c:-1,r:0},'ArrowRight':{c:1,r:0},
+               'w':{c:0,r:-1},'s':{c:0,r:1},'a':{c:-1,r:0},'d':{c:1,r:0},
+               'W':{c:0,r:-1},'S':{c:0,r:1},'A':{c:-1,r:0},'D':{c:1,r:0}};
+    if(m[e.key]){
+      const d = m[e.key];
+      // disallow 180° reverse
+      if(d.c === -this.dir.c && d.r === -this.dir.r) return true;
+      this.queueDir = d;
+      e.preventDefault();
+      return true;
+    }
+    if(e.key===' '){ if(this.dead) this.reset(); else this.paused=!this.paused; e.preventDefault(); return true; }
+    return false;
+  }
+  step(){
+    if(this.dead||this.paused) return;
+    if(this.queueDir){ this.dir = this.queueDir; this.queueDir = null; }
+    const head = this.snake[0];
+    const nh = {c: head.c + this.dir.c, r: head.r + this.dir.r};
+    // wall
+    if(nh.c<=0||nh.c>=this.gw-1||nh.r<=0||nh.r>=this.gh-1){ this.dead=true; return; }
+    // self
+    if(this.snake.some(s=>s.c===nh.c&&s.r===nh.r)){ this.dead=true; return; }
+    this.snake.unshift(nh);
+    if(nh.c===this.food.c && nh.r===this.food.r){
+      this.score++; this.placeFood();
+    } else {
+      this.snake.pop();
+    }
+  }
+  draw(){
+    this.tickAccum++;
+    if(this.tickAccum >= this.speed){ this.tickAccum=0; this.step(); }
+
+    const c = this.win.ctx;
+    const W = this.win.pixW, H = this.win.pixH;
+    c.fillStyle = BG; c.fillRect(0,0,W,H);
+    const cs = Math.max(10, Math.floor(Math.min(W/(this.gw+2), (H-30)/(this.gh+1))));
+    const put = makePut(c, cs);
+    const ox = Math.floor((W - this.gw*cs)/2 / cs);
+    const oy = 1;
+
+    // arena walls
+    for(let cc=0;cc<this.gw;cc++){
+      put.put('▓', ox+cc, oy, LOW, 0.85);
+      put.put('▓', ox+cc, oy+this.gh-1, LOW, 0.85);
+    }
+    for(let rr=0;rr<this.gh;rr++){
+      put.put('▓', ox, oy+rr, LOW, 0.85);
+      put.put('▓', ox+this.gw-1, oy+rr, LOW, 0.85);
+    }
+    // food
+    put.put('●', ox+this.food.c, oy+this.food.r, WARM, 0.85+0.15*Math.sin(t*0.2));
+    // snake
+    for(let i=0;i<this.snake.length;i++){
+      const s = this.snake[i];
+      const ch = i===0 ? '▣' : (i%2===0?'▒':'▓');
+      const col = i===0 ? ACCENT : HI;
+      put.put(ch, ox+s.c, oy+s.r, col, 1 - i*0.02);
+    }
+    // hud
+    const hudR = oy + this.gh + 1;
+    put.text('SCORE '+this.score, ox, hudR, HI, 1);
+    if(this.dead) put.text(' GAME OVER · SPACE to restart ', ox+8, hudR, ACCENT, 0.8+0.2*Math.sin(t*0.2));
+    else if(this.paused) put.text(' PAUSED · SPACE to resume ', ox+8, hudR, MID, 0.9);
+    else put.text(' WASD/arrows  SPACE pause ', ox+8, hudR, MID, 0.7);
+  }
+  destroy(){}
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BUILT-IN APP: LIFE (Conway's Game of Life)
+// ─────────────────────────────────────────────────────────────────────────
+class Life {
+  constructor(){
+    this.gw = 60; this.gh = 36;
+    this.grid = null;
+    this.next = null;
+    this.age = null;
+    this.gen = 0;
+    this.paused = false;
+    this.speed = 4;     // ticks-per-frame divisor (lower = faster)
+    this.painting = 0;  // 0=none, 1=draw, -1=erase
+    this.reset(true);
+    this.hits = [];
+  }
+  reset(seed){
+    const n = this.gw*this.gh;
+    this.grid = new Uint8Array(n);
+    this.next = new Uint8Array(n);
+    this.age  = new Uint16Array(n);
+    this.gen = 0;
+    if(seed){
+      // a soup
+      for(let i=0;i<n;i++) if(Math.random()<0.22) this.grid[i] = 1;
+    }
+  }
+  clear(){ const n=this.gw*this.gh; this.grid.fill(0); this.next.fill(0); this.age.fill(0); this.gen=0; }
+  glider(cx,cy){
+    // R-pentomino seed
+    const pts = [[0,1],[0,2],[1,0],[1,1],[2,1]];
+    for(const [dx,dy] of pts){
+      const x = cx+dx, y = cy+dy;
+      if(x>=0&&x<this.gw&&y>=0&&y<this.gh) this.grid[y*this.gw+x] = 1;
+    }
+  }
+  step(){
+    const w=this.gw, h=this.gh;
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        let n = 0;
+        for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+          if(!dx && !dy) continue;
+          const nx = (x+dx+w)%w, ny = (y+dy+h)%h;
+          n += this.grid[ny*w+nx];
+        }
+        const i = y*w+x;
+        const alive = this.grid[i];
+        const next = (alive ? (n===2||n===3) : n===3) ? 1 : 0;
+        this.next[i] = next;
+        if(next){ this.age[i] = Math.min(65535, (alive ? this.age[i]+1 : 1)); }
+        else this.age[i] = 0;
+      }
+    }
+    [this.grid, this.next] = [this.next, this.grid];
+    this.gen++;
+  }
+  mount(){
+    const c = this.win.canvasEl;
+    c.addEventListener('mousedown', (e)=>this._down(e));
+    c.addEventListener('mousemove', (e)=>this._move(e));
+    c.addEventListener('mouseup',   ()=>{ this.painting = 0; });
+    c.addEventListener('mouseleave',()=>{ this.painting = 0; });
+  }
+  resize(){}
+  _localCell(e){
+    const r = this.win.canvasEl.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    return { x, y };
+  }
+  _down(e){
+    const {x, y} = this._localCell(e);
+    for(const h of this.hits){
+      if(x>=h.x && x<h.x+h.w && y>=h.y && y<h.y+h.h){ h.action(); return; }
+    }
+    if(this._gridHit){
+      const {gx0, gy0, ccs} = this._gridHit;
+      const gx = Math.floor((x - gx0)/ccs), gy = Math.floor((y - gy0)/ccs);
+      if(gx>=0 && gx<this.gw && gy>=0 && gy<this.gh){
+        const i = gy*this.gw + gx;
+        const cur = this.grid[i];
+        this.painting = cur ? -1 : 1;
+        this.grid[i] = this.painting>0 ? 1 : 0;
+      }
+    }
+  }
+  _move(e){
+    if(!this.painting) return;
+    const {x, y} = this._localCell(e);
+    if(!this._gridHit) return;
+    const {gx0, gy0, ccs} = this._gridHit;
+    const gx = Math.floor((x - gx0)/ccs), gy = Math.floor((y - gy0)/ccs);
+    if(gx>=0 && gx<this.gw && gy>=0 && gy<this.gh){
+      this.grid[gy*this.gw + gx] = this.painting>0 ? 1 : 0;
+    }
+  }
+  onKey(e){
+    if(e.key===' '){ this.paused = !this.paused; return true; }
+    if(e.key==='c'||e.key==='C'){ this.clear(); return true; }
+    if(e.key==='r'||e.key==='R'){ this.reset(true); return true; }
+    if(e.key==='+'||e.key==='='){ this.speed = Math.max(1, this.speed-1); return true; }
+    if(e.key==='-'){ this.speed = Math.min(20, this.speed+1); return true; }
+    return false;
+  }
+  draw(){
+    if(!this.paused && (t % this.speed === 0)) this.step();
+    const c = this.win.ctx;
+    const W = this.win.pixW, H = this.win.pixH;
+    c.fillStyle = BG; c.fillRect(0,0,W,H);
+    const ccs = Math.max(8, Math.floor(Math.min(W/(this.gw+2), (H-40)/(this.gh+2))));
+    const put = makePut(c, ccs);
+    const ccols = Math.floor(W/ccs), crows = Math.floor(H/ccs);
+    // border
+    for(let cc=1;cc<ccols-1;cc++){ put.put('═', cc, 0, MID, 0.8); put.put('═', cc, crows-1, MID, 0.8); }
+    for(let rr=1;rr<crows-1;rr++){ put.put('║', 0, rr, MID, 0.8); put.put('║', ccols-1, rr, MID, 0.8); }
+    put.put('╔',0,0,MID,1); put.put('╗',ccols-1,0,MID,1); put.put('╚',0,crows-1,MID,1); put.put('╝',ccols-1,crows-1,MID,1);
+    put.text(' LIFE · gen '+this.gen+' ', 2, 0, PHERO, 1);
+
+    const gx0 = Math.floor((W - this.gw*ccs)/2);
+    const gy0 = ccs * 2;
+    this._gridHit = { gx0, gy0, ccs };
+    // grid
+    for(let y=0;y<this.gh;y++){
+      for(let x=0;x<this.gw;x++){
+        const i = y*this.gw+x;
+        if(!this.grid[i]) continue;
+        const a = Math.min(20, this.age[i]);
+        const ch = a < 2 ? '◌' : a < 4 ? '○' : a < 8 ? '●' : '◉';
+        const col = a < 2 ? LIM : a < 4 ? PHERO : a < 8 ? AQU : VIO;
+        c.globalAlpha = 0.95;
+        c.fillStyle = col;
+        c.fillText(ch, gx0 + x*ccs + ccs/2, gy0 + y*ccs + (ccs - Math.floor(ccs*1.02))/2 + 1);
+        c.globalAlpha = 1;
+      }
+    }
+    // controls row
+    this.hits = [];
+    const cy = crows - 2;
+    let cx = 2;
+    const btns = [
+      {l:'[ '+(this.paused?'▶ play':'❚❚ pause')+' ]', col:CURSOR, a:()=>{ this.paused = !this.paused; }},
+      {l:'[ step ]', col:LIM, a:()=>{ this.step(); }},
+      {l:'[ clear ]', col:WARN, a:()=>{ this.clear(); }},
+      {l:'[ soup ]', col:PHERO, a:()=>{ this.reset(true); }},
+      {l:'[ R-pent ]', col:VIO, a:()=>{ this.clear(); this.glider(this.gw>>1, this.gh>>1); }},
+    ];
+    for(const b of btns){
+      put.text(b.l, cx, cy, b.col, 0.95);
+      this.hits.push({x:cx*ccs, y:cy*ccs, w:b.l.length*ccs, h:ccs, action:b.a});
+      cx += b.l.length + 1;
+    }
+    put.text('speed ×'+(20-this.speed)+'  · click cells to paint · space pause', 2, crows-1+0, MID, 0);
+  }
+  destroy(){}
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BUILT-IN APP: TERM (fake shell with a few real commands)
+// ─────────────────────────────────────────────────────────────────────────
+class Term {
+  constructor(){
+    this.lines = [];
+    this.input = '';
+    this.cursorOn = true;
+    this.history = [];
+    this.histIdx = -1;
+    this.scroll = 0;
+    this.pwd = '/characterworld';
+    this._println(' characterworld/os terminal · type "help"');
+    this._println('');
+    this.commands = {
+      help: ()=>this._println('  commands: help · ls · cd · echo · cat · open · launch · clear · date · whoami · joke · banner · uptime · sort · sl · cowsay · matrix'),
+      ls:   ()=>{
+        const list = [
+          'charactershop/  characterfilm/  charactergrain/  charactertracker/  characterdelve/',
+          'README.md  AGENTS.md  CLAUDE.md  index.html',
+          'system/  accessories/',
+        ];
+        for(const l of list) this._println(l);
+      },
+      cd:   (a)=>{ this.pwd = '/' + (a?a:'characterworld').replace(/^\/+/,''); },
+      echo: (...a)=>this._println(a.join(' ')),
+      cat:  (a)=>{
+        if(!a) return this._println('cat: missing operand');
+        // local paths only — no protocols, no protocol-relative, no parent-dir traversal
+        if(/^[a-z]+:/i.test(a) || a.startsWith('//') || a.includes('..')){
+          return this._println('cat: local paths only');
+        }
+        fetch(a).then(r=> r.ok ? r.text() : Promise.reject(r.status))
+          .then(txt=>{ for(const ln of txt.split('\n').slice(0,40)) this._println(ln); })
+          .catch(err=>this._println('cat: '+err));
+      },
+      open: (a)=>{
+        const app = appById(a||'');
+        if(!app) return this._println('open: unknown program: '+a);
+        spawnWindow(app); this._println('opened '+app.label+'.');
+      },
+      launch: (a)=>this.commands.open(a),
+      clear: ()=>{ this.lines = []; },
+      date:  ()=>this._println(new Date().toString()),
+      whoami:()=>this._println('visitor'),
+      uptime:()=>this._println('up '+Math.floor((performance.now()-_BOOT)/1000)+'s · 1 user · load 0.42 0.39 0.31'),
+      joke:  ()=>this._println(JOKES[Math.floor(Math.random()*JOKES.length)]),
+      banner:(...a)=>{
+        const txt = (a.join(' ')||'CHARACTERWORLD').toUpperCase();
+        this._println('  '+txt.split('').map(c=> '▓'+c+'▓').join(' '));
+      },
+      sort: ()=>{
+        const xs = [];
+        for(let i=0;i<10;i++) xs.push(Math.floor(Math.random()*100));
+        this._println('  in: '+xs.join(' '));
+        this._println(' out: '+xs.slice().sort((a,b)=>a-b).join(' '));
+      },
+      sl:   ()=>{ for(const ln of TRAIN) this._println(ln); },
+      cowsay: (...a)=>{
+        const m = a.join(' ') || 'mooo';
+        const top = ' '+'_'.repeat(m.length+2);
+        this._println(top);
+        this._println('< '+m+' >');
+        this._println(' '+'-'.repeat(m.length+2));
+        this._println('        \\   ^__^');
+        this._println('         \\  (oo)\\_______');
+        this._println('            (__)\\       )\\/\\');
+        this._println('                ||----w |');
+        this._println('                ||     ||');
+      },
+      matrix: ()=>{
+        for(let i=0;i<8;i++){
+          let s = '';
+          for(let j=0;j<48;j++) s += '─│┃┐└┘╳┼·.•◦∘'[Math.floor(Math.random()*13)];
+          this._println(s);
+        }
+      },
+    };
+  }
+  _println(s){ this.lines.push(s); }
+  _prompt(){ return this.pwd + ' $ '; }
+  mount(){
+    const cnv = this.win.canvasEl;
+    cnv.addEventListener('mousedown', ()=>{ /* focus handled by win */ });
+  }
+  resize(){}
+  onKey(e){
+    if(e.metaKey || e.ctrlKey){
+      if(e.key==='l'){ this.commands.clear(); e.preventDefault(); return true; }
+      if(e.key==='c'){ this._println(this._prompt() + this.input + '^C'); this.input=''; e.preventDefault(); return true; }
+    }
+    if(e.key==='Enter'){
+      this._println(this._prompt() + this.input);
+      const cmd = this.input.trim();
+      this.input = '';
+      if(cmd){
+        this.history.push(cmd); this.histIdx = this.history.length;
+        const [name, ...args] = cmd.split(/\s+/);
+        const fn = this.commands[name];
+        if(fn) fn(...args);
+        else this._println(name+': command not found');
+      }
+      e.preventDefault();
+      return true;
+    }
+    if(e.key==='Backspace'){ this.input = this.input.slice(0,-1); e.preventDefault(); return true; }
+    if(e.key==='ArrowUp'){
+      if(this.histIdx>0){ this.histIdx--; this.input = this.history[this.histIdx]||''; }
+      e.preventDefault(); return true;
+    }
+    if(e.key==='ArrowDown'){
+      if(this.histIdx<this.history.length){ this.histIdx++; this.input = this.history[this.histIdx]||''; }
+      e.preventDefault(); return true;
+    }
+    if(e.key.length===1 && !e.ctrlKey && !e.metaKey){ this.input += e.key; return true; }
+    return false;
+  }
+  draw(){
+    const c = this.win.ctx;
+    const W = this.win.pixW, H = this.win.pixH;
+    c.fillStyle = BG; c.fillRect(0,0,W,H);
+    const ccs = Math.max(11, Math.floor(Math.min(W/80, H/30)));
+    const put = makePut(c, ccs);
+    const ccols = Math.floor(W/ccs), crows = Math.floor(H/ccs);
+    // border
+    for(let cc=1;cc<ccols-1;cc++){ put.put('═', cc, 0, MID, 0.8); put.put('═', cc, crows-1, MID, 0.8); }
+    for(let rr=1;rr<crows-1;rr++){ put.put('║', 0, rr, MID, 0.8); put.put('║', ccols-1, rr, MID, 0.8); }
+    put.put('╔',0,0,MID,1); put.put('╗',ccols-1,0,MID,1); put.put('╚',0,crows-1,MID,1); put.put('╝',ccols-1,crows-1,MID,1);
+    put.text(' /bin/term ', 2, 0, LIM, 1);
+    // body
+    const inner = ccols - 4;
+    const visible = crows - 3;
+    const allLines = this.lines.slice(-visible+1);
+    for(let i=0;i<allLines.length;i++){
+      put.text(allLines[i].slice(0, inner), 2, 1+i, INK, 0.95);
+    }
+    // input line
+    const ir = 1 + allLines.length;
+    const promptStr = this._prompt();
+    put.text(promptStr, 2, ir, LIM, 1);
+    put.text(this.input.slice(-inner+promptStr.length), 2+promptStr.length, ir, INK, 1);
+    if(Math.floor(t/30)%2===0) put.put('█', 2+promptStr.length+this.input.length, ir, CURSOR, 0.95);
+  }
+  destroy(){}
+}
+const JOKES = [
+  'why did the glyph cross the page? to render the other side.',
+  'a character walks into a bar. \"sorry, no images allowed.\"',
+  'unicode and ascii are at a party. ascii leaves early; he was feeling 7-bit.',
+  'i tried to write a joke in zalgo but it consumed the punchline.',
+];
+const TRAIN = [
+  '      ====        _________               ___________',
+  '  _D _|  |_______/        \\__I_I_____===__|___________|',
+  '   |(_)---  |   H\\________/ |   |        =|___ ___|   ',
+  '   /     |  |   H  |  |     |   |         ||_- |   |  ',
+  '  |      |  |   H  |__-----------------------------|  ',
+  '  | ________|___H__/__|_____/[][]~\\_______________|  ',
+  '  |/ |   |-----------I_____I [][] []  D   |=======|__|',
+  '__/ =| o |=-O=====O=====O=====O \\ ____Y___________|__ ',
+];
+let _BOOT = performance.now();
+
+// ─────────────────────────────────────────────────────────────────────────
+// BUILT-IN APP: CLOCK (multi-zone analog-ish clock in glyphs)
+// ─────────────────────────────────────────────────────────────────────────
+class Clock {
+  constructor(){
+    this.zones = [
+      {label:'LOCAL', offset: -new Date().getTimezoneOffset()/60},
+      {label:'UTC',   offset: 0},
+      {label:'NYC',   offset: -5},
+      {label:'TOKYO', offset: 9},
+    ];
+  }
+  mount(){}
+  resize(){}
+  onKey(){ return false; }
+  _now(off){
+    const d = new Date();
+    const utc = d.getTime() + d.getTimezoneOffset()*60000;
+    return new Date(utc + off*3600000);
+  }
+  draw(){
+    const c = this.win.ctx;
+    const W = this.win.pixW, H = this.win.pixH;
+    c.fillStyle = BG; c.fillRect(0,0,W,H);
+    const ccs = Math.max(12, Math.floor(Math.min(W/52, H/28)));
+    const put = makePut(c, ccs);
+    const ccols = Math.floor(W/ccs), crows = Math.floor(H/ccs);
+    // border
+    for(let cc=1;cc<ccols-1;cc++){ put.put('═', cc, 0, MID, 0.8); put.put('═', cc, crows-1, MID, 0.8); }
+    for(let rr=1;rr<crows-1;rr++){ put.put('║', 0, rr, MID, 0.8); put.put('║', ccols-1, rr, MID, 0.8); }
+    put.put('╔',0,0,MID,1); put.put('╗',ccols-1,0,MID,1); put.put('╚',0,crows-1,MID,1); put.put('╝',ccols-1,crows-1,MID,1);
+    put.text(' CLOCK ', 2, 0, CURSOR, 1);
+
+    // big digital clock at top, hh:mm:ss
+    const d = this._now(this.zones[0].offset);
+    const hh = pad2(d.getHours()), mm = pad2(d.getMinutes()), ss = pad2(d.getSeconds());
+    const big = hh+':'+mm+':'+ss;
+    const bx = Math.floor((ccols - big.length*2)/2);
+    for(let i=0;i<big.length;i++){
+      const col = big[i]===':' ? CURSOR : (i<2?HI : i<5?ACC : VIO);
+      put.put(big[i], bx + i*2, 2, col, 1);
+      put.put(big[i], bx + i*2, 3, col, 0.6);
+    }
+    // analog face: hour ring of 12 glyphs, hand directions
+    const cy = 8 + Math.floor((crows-12)/2);
+    const radius = Math.min(8, Math.floor((crows-cy-3)/2));
+    const cx = Math.floor(ccols/2);
+    for(let h=0; h<12; h++){
+      const a = (h/12) * Math.PI*2 - Math.PI/2;
+      const x = cx + Math.round(Math.cos(a) * radius * 1.6);
+      const y = cy + Math.round(Math.sin(a) * radius);
+      const m = (h%3===0) ? '◆' : '·';
+      put.put(m, x, y, h%3===0?SUN:MID, 0.9);
+    }
+    const drawHand = (ang, len, col, ch) =>{
+      for(let i=1;i<=len;i++){
+        const x = cx + Math.round(Math.cos(ang) * i * 1.6);
+        const y = cy + Math.round(Math.sin(ang) * i);
+        put.put(ch, x, y, col, 0.95);
+      }
+    };
+    const sec = d.getSeconds()+d.getMilliseconds()/1000;
+    const min = d.getMinutes()+sec/60;
+    const hour = (d.getHours()%12)+min/60;
+    drawHand(hour/12*Math.PI*2 - Math.PI/2, Math.max(2,radius-3), HI, '█');
+    drawHand(min/60*Math.PI*2 - Math.PI/2, Math.max(2,radius-1), ACC, '▓');
+    drawHand(sec/60*Math.PI*2 - Math.PI/2, radius, WARN, '·');
+    put.put('◉', cx, cy, CURSOR, 1);
+
+    // zone strip at bottom
+    const yz = crows - 3;
+    for(let i=0;i<this.zones.length && i<4;i++){
+      const z = this.zones[i];
+      const zd = this._now(z.offset);
+      const lbl = z.label.padEnd(6,' ')+pad2(zd.getHours())+':'+pad2(zd.getMinutes());
+      const c0 = 2 + i * Math.floor((ccols-4)/this.zones.length);
+      put.text(lbl, c0, yz, RAINBOW[i % RAINBOW.length], 0.95);
+    }
+  }
+  destroy(){}
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CHAR-NET — character-only hypertext. The browser navigates these pages.
+// Pages are rendered as text on the window's own canvas. No iframes, no
+// external graphics. The internet of this universe is type.
+// ─────────────────────────────────────────────────────────────────────────
+const PAGES = {
+  'char://home': {
+    title: 'CHAR-NET / home',
+    body: [
+      ['art',  ['  ░▒▓ CHAR-NET ▓▒░',
+                '  the typewritten ether','']],
+      ['h2',   'welcome, visitor.'],
+      ['p',    'CHAR-NET is the public hypertext of CHARACTERWORLD/OS.'],
+      ['p',    'no images. no scripts. no iframes. every page is type.'],
+      ['p',    'pick a page below. or punch a char:// url into the bar.'],
+      ['hr'],
+      ['h3',   '— index —'],
+      ['link', 'char://manifesto',  'the manifesto'],
+      ['link', 'char://atlas',      'atlas of programs'],
+      ['link', 'char://changelog',  'changelog'],
+      ['link', 'char://glyphs',     'glyph compendium'],
+      ['link', 'char://shortcuts',  'keyboard shortcuts'],
+      ['link', 'char://news',       'today on char-net'],
+      ['link', 'char://credits',    'credits'],
+    ],
+  },
+  'char://manifesto': {
+    title: 'CHAR-NET / manifesto',
+    body: [
+      ['h1', 'manifesto'],
+      ['p',  'we did not invent pixels here. we kept the type.'],
+      ['p',  'every visible form is a typed glyph: ascii, unicode, box drawing, blocks, combining marks.'],
+      ['p',  'a font is the only graphics card.'],
+      ['p',  'a paragraph is the only image.'],
+      ['p',  'colour is permitted. shape is not.'],
+      ['hr'],
+      ['quote', '"the rule is the rule. its consequences are the art."'],
+      ['p', '— willbear, 2026'],
+      ['hr'],
+      ['link','char://home','◂ back to home'],
+    ],
+  },
+  'char://atlas': {
+    title: 'CHAR-NET / atlas',
+    body: [
+      ['h1','atlas of programs'],
+      ['p','every program in CHARACTERWORLD/OS, with a launch link.'],
+      ['hr'],
+      ['h3','— programs —'],
+      ['app','atelier','character paint'],
+      ['app','film',   'character video editor'],
+      ['app','grain',  'generative granular synth'],
+      ['app','tracker','16-voice breakcore tracker'],
+      ['app','delve',  'character roguelike'],
+      ['hr'],
+      ['h3','— accessories —'],
+      ['app','browser','this browser'],
+      ['app','files',  'two-pane file manager'],
+      ['app','calc',   'calculator'],
+      ['app','snake',  'snake'],
+      ['app','sort',   'sort visualizer'],
+      ['app','about',  'readme'],
+      ['hr'],
+      ['link','char://home','◂ home'],
+    ],
+  },
+  'char://changelog': {
+    title: 'CHAR-NET / changelog',
+    body: [
+      ['h1','changelog'],
+      ['h3','v0.6 — colour & motion'],
+      ['li','grain palette adopted system-wide'],
+      ['li','mycelium wallpaper · subdued'],
+      ['li','character-only browser, finally'],
+      ['li','right-click context menus everywhere'],
+      ['li','sort visualiser, conway, more'],
+      ['h3','v0.5 — desktop'],
+      ['li','draggable icons + start menu'],
+      ['li','window manager (drag, resize, focus, z-order)'],
+      ['li','built-in calculator, snake'],
+      ['h3','v0.4 — landing'],
+      ['li','norton-commander program-manager grid'],
+      ['hr'],
+      ['link','char://home','◂ home'],
+    ],
+  },
+  'char://glyphs': {
+    title: 'CHAR-NET / glyphs',
+    body: [
+      ['h1','glyph compendium'],
+      ['p','a partial inventory of what we paint with.'],
+      ['h3','— blocks —'],
+      ['code','░ ▒ ▓ █  ▁ ▂ ▃ ▄ ▅ ▆ ▇  ▔ ▕ ▖ ▗ ▘ ▙ ▚ ▛ ▜ ▝ ▞ ▟'],
+      ['h3','— box drawing —'],
+      ['code','─ │ ┌ ┐ └ ┘ ┼ ╳   ═ ║ ╔ ╗ ╚ ╝ ╠ ╣ ╦ ╩ ╬'],
+      ['h3','— dots & circles —'],
+      ['code','· ∙ • ∘ ◦ ◌ ◍ ◎ ○ ◯ ● ◉ ⦿ ⬤'],
+      ['h3','— marks —'],
+      ['code','∴ ∵ ⋮ ⋯  ▪ ▫ ◆ ◇  ‹ › « »  / \\ | ¦ † ‡ §'],
+      ['h3','— zalgo above —'],
+      ['code','◌́ ◌̂ ◌̃ ◌̆ ◌̌ ◌͛ ◌ͣ ◌ͬ'],
+      ['hr'],
+      ['link','char://home','◂ home'],
+    ],
+  },
+  'char://shortcuts': {
+    title: 'CHAR-NET / shortcuts',
+    body: [
+      ['h1','keyboard shortcuts'],
+      ['kv','CTRL+S',     'toggle start menu'],
+      ['kv','CTRL+1..9,0','open program N'],
+      ['kv','F1',         'open the github repo'],
+      ['kv','ESC',        'close start menu / popups'],
+      ['kv','right-click', 'context menu (desktop, icon, window)'],
+      ['kv','double-click','title bar → maximize'],
+      ['hr'],
+      ['h3','— per-program —'],
+      ['kv','snake',      'WASD/arrows, SPACE pause/restart'],
+      ['kv','sort',       '+/- speed, SPACE shuffle'],
+      ['kv','calc',       'numbers + operators + ENTER'],
+      ['kv','browser',    'CTRL+L focus url, CTRL+R reload'],
+      ['hr'],
+      ['link','char://home','◂ home'],
+    ],
+  },
+  'char://news': {
+    title: 'CHAR-NET / news',
+    body: [
+      ['h1','today on char-net'],
+      ['li','GLYPHWEEK fundraiser at 80% — see char://credits'],
+      ['li','someone planted a tip in the lower-left of the wallpaper. it is still there.'],
+      ['li','the SORT board reports cocktail sort tied insertion at last fortnight\'s tournament.'],
+      ['li','a mycelium has reached cell (cols-3, rows-3). nutrient field stable.'],
+      ['li','rumour: a CRT bezel will return next patch.'],
+      ['hr'],
+      ['link','char://home','◂ home'],
+    ],
+  },
+  'char://credits': {
+    title: 'CHAR-NET / credits',
+    body: [
+      ['h1','credits'],
+      ['p','willbear / glitches — typing, painting, growing.'],
+      ['p','characterworld is a stack of single-file pieces; each one is its own author.'],
+      ['p','nothing here would exist without ASCII, unicode, and the people who decided that ▓ should print.'],
+      ['hr'],
+      ['link','char://home','◂ home'],
+    ],
+  },
+  'char://404': {
+    title: 'CHAR-NET / not found',
+    body: [
+      ['h1','404 — character not found'],
+      ['p','that page is unbound to any glyph in this corpus.'],
+      ['p','perhaps try one of these:'],
+      ['link','char://home','· char://home'],
+      ['link','char://atlas','· char://atlas'],
+    ],
+  },
+};
+
+class Browser {
+  constructor(){
+    this.history = [];
+    this.histIdx = -1;
+    this.url = '';
+    this.input = '';
+    this.editing = false;
+    this.scroll = 0;
+    this.bookmarks = [
+      {label:'HOME',     url:'char://home'},
+      {label:'MANIFEST', url:'char://manifesto'},
+      {label:'ATLAS',    url:'char://atlas'},
+      {label:'GLYPHS',   url:'char://glyphs'},
+      {label:'NEWS',     url:'char://news'},
+      {label:'KEYS',     url:'char://shortcuts'},
+    ];
+    this.hits = [];
+    this.linkHits = [];
+  }
+  _normalize(u){
+    u = (u||'').trim();
+    if(!u) return '';
+    if(u.startsWith('char://')) return u;
+    if(/^[a-z]+:/i.test(u)) return u;
+    return 'char://' + u;
+  }
+  mount(){
+    this.win.canvasEl.addEventListener('mousedown', (e)=>this._onClick(e));
+    this.win.canvasEl.addEventListener('wheel', (e)=>{
+      this.scroll = Math.max(0, this.scroll + Math.sign(e.deltaY)*2);
+      e.preventDefault();
+    }, {passive:false});
+    this.navigate('char://home');
+  }
+  resize(){}
+  _focusInput(){ this.editing = true; this.input = this.url; }
+  navigate(url){
+    const u = this._normalize(url);
+    if(!u) return;
+    if(u.startsWith('app://')){
+      const id = u.slice('app://'.length).replace(/\/$/, '');
+      const a = appById(id);
+      if(a) spawnWindow(a);
+      return;
+    }
+    this.history = this.history.slice(0, this.histIdx+1);
+    this.history.push(u);
+    this.histIdx = this.history.length-1;
+    this.url = u;
+    this.input = u;
+    this.scroll = 0;
+    this.editing = false;
+  }
+  back(){ if(this.histIdx>0){ this.histIdx--; this.url = this.input = this.history[this.histIdx]; this.scroll = 0; } }
+  forward(){ if(this.histIdx<this.history.length-1){ this.histIdx++; this.url = this.input = this.history[this.histIdx]; this.scroll = 0; } }
+  reload(){ this.scroll = 0; }
+  onKey(e){
+    if(this.editing){
+      if(e.key==='Enter'){ this.editing=false; this.navigate(this.input); e.preventDefault(); return true; }
+      if(e.key==='Escape'){ this.editing=false; this.input=this.url; return true; }
+      if(e.key==='Backspace'){ this.input=this.input.slice(0,-1); return true; }
+      if(e.key.length===1 && !e.metaKey && !e.ctrlKey){ this.input += e.key; return true; }
+      return true;
+    }
+    if(e.key==='l' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); this._focusInput(); return true; }
+    if(e.key==='r' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); this.reload(); return true; }
+    if(e.key==='ArrowDown'){ this.scroll++; return true; }
+    if(e.key==='ArrowUp'){ this.scroll = Math.max(0, this.scroll-1); return true; }
+    if(e.key==='PageDown'){ this.scroll += 8; return true; }
+    if(e.key==='PageUp'){ this.scroll = Math.max(0, this.scroll-8); return true; }
+    if(e.key==='Backspace'){ this.back(); return true; }
+    return false;
+  }
+  _onClick(e){
+    const r = this.win.canvasEl.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    for(const h of this.hits){
+      if(x>=h.x && x<h.x+h.w && y>=h.y && y<h.y+h.h){ h.action(); return; }
+    }
+    for(const h of this.linkHits){
+      if(x>=h.x && x<h.x+h.w && y>=h.y && y<h.y+h.h){ h.action(); return; }
+    }
+  }
+  draw(){
+    const c = this.win.ctx;
+    const W = this.win.pixW, H = this.win.pixH;
+    c.fillStyle = BG; c.fillRect(0,0,W,H);
+    const cs = Math.max(11, Math.floor(Math.min(W/72, H/30)));
+    const put = makePut(c, cs);
+    const cols = Math.floor(W/cs), rows = Math.floor(H/cs);
+
+    // outer border
+    for(let cc=1;cc<cols-1;cc++){ put.put('═', cc, 0, MID, 0.8); put.put('═', cc, rows-1, MID, 0.8); }
+    for(let rr=1;rr<rows-1;rr++){ put.put('║', 0, rr, MID, 0.8); put.put('║', cols-1, rr, MID, 0.8); }
+    put.put('╔',0,0,MID,1); put.put('╗',cols-1,0,MID,1); put.put('╚',0,rows-1,MID,1); put.put('╝',cols-1,rows-1,MID,1);
+
+    this.hits = [];
+    this.linkHits = [];
+
+    // ── chrome row (nav, url) ──
+    const navs = [
+      {l:'◂', a:()=>this.back(), col:SKY, en:this.histIdx>0},
+      {l:'▸', a:()=>this.forward(), col:SKY, en:this.histIdx<this.history.length-1},
+      {l:'↻', a:()=>this.reload(), col:LIM, en:true},
+      {l:'⌂', a:()=>this.navigate('char://home'), col:SUN, en:true},
+    ];
+    let cx = 2;
+    for(const n of navs){
+      const a = n.en ? 0.95 : 0.3;
+      put.put('[', cx, 1, MID, a);
+      put.put(n.l, cx+1, 1, n.col, a);
+      put.put(']', cx+2, 1, MID, a);
+      if(n.en) this.hits.push({x:cx*cs, y:cs, w:3*cs, h:cs, action:n.a});
+      cx += 4;
+    }
+    put.put('│', cx, 1, LOW, 0.6); cx += 2;
+    // url bar
+    const urlMax = cols - cx - 3;
+    const shown = (this.editing ? this.input : this.url).slice(0, urlMax-1);
+    put.text(shown, cx, 1, this.editing ? CURSOR : ACC, 1);
+    if(this.editing){
+      put.put(Math.floor(t/30)%2===0 ? '█' : '▒', cx+shown.length, 1, CURSOR, 0.9);
+    }
+    this.hits.push({x:cx*cs, y:cs, w:urlMax*cs, h:cs, action:()=>this._focusInput()});
+
+    // ── bookmarks row ──
+    let bx = 2;
+    put.put('☆', bx, 2, SUN, 0.95); bx += 2;
+    for(let bi=0; bi<this.bookmarks.length; bi++){
+      const b = this.bookmarks[bi];
+      const ww = b.label.length+2;
+      if(bx + ww > cols-2) break;
+      const col = RAINBOW[bi % RAINBOW.length];
+      const here = this.url === b.url;
+      put.put('[', bx, 2, MID, 0.6);
+      put.text(b.label, bx+1, 2, here ? CURSOR : col, here ? 1 : 0.92);
+      put.put(']', bx+1+b.label.length, 2, MID, 0.6);
+      this.hits.push({x:bx*cs, y:2*cs, w:ww*cs, h:cs, action:()=>this.navigate(b.url)});
+      bx += ww + 1;
+    }
+
+    // separator
+    for(let i=1;i<cols-1;i++) put.put('─', i, 3, LOW, 0.5);
+
+    // ── content area: render the page ──
+    const page = PAGES[this.url] || PAGES['char://404'];
+    const contentR0 = 5, contentR1 = rows - 3;
+    const contentW = cols - 6;
+    const lines = this._layout(page, contentW);
+    const visible = contentR1 - contentR0;
+    if(this.scroll > Math.max(0, lines.length - visible)) this.scroll = Math.max(0, lines.length - visible);
+
+    // page title strip
+    put.text(' '+page.title+' ', 3, 4, INK, 1);
+    // a thin bar of accent colors
+    for(let i=0;i<cols-6;i++){
+      const col = RAINBOW[(i + Math.floor(t/40)) % RAINBOW.length];
+      put.put('▔', 3+i, contentR0-1, col, 0.5);
+    }
+
+    for(let li=0; li<visible && li+this.scroll<lines.length; li++){
+      const ln = lines[li+this.scroll];
+      const r = contentR0 + li;
+      this._drawLine(put, ln, 3, r, contentW, cs);
+    }
+
+    // scroll indicator
+    if(lines.length > visible){
+      const total = lines.length, top = this.scroll, bot = top+visible;
+      const trackH = visible;
+      const knobH = Math.max(1, Math.floor(visible * visible / total));
+      const knobY = Math.floor(top * (trackH - knobH) / Math.max(1, total - visible));
+      for(let i=0;i<trackH;i++){
+        const inKnob = i >= knobY && i < knobY + knobH;
+        put.put(inKnob ? '█' : '│', cols-2, contentR0+i, inKnob ? ACC : LOW, inKnob ? 0.85 : 0.4);
+      }
+      put.text((top+1)+'-'+Math.min(bot,total)+'/'+total, 3, rows-2, MID, 0.7);
+    } else {
+      put.text(' end ', 3, rows-2, MID, 0.6);
+    }
+  }
+  _layout(page, w){
+    const out = [];
+    for(const block of page.body){
+      const kind = block[0];
+      if(kind==='h1'){ out.push({k:'h1', text:block[1].toUpperCase()}); out.push({k:'rule'}); out.push({k:'blank'}); }
+      else if(kind==='h2'){ out.push({k:'h2', text:block[1]}); out.push({k:'blank'}); }
+      else if(kind==='h3'){ out.push({k:'h3', text:block[1]}); }
+      else if(kind==='p'){
+        for(const wl of this._wrap(block[1], w)) out.push({k:'p', text:wl});
+        out.push({k:'blank'});
+      }
+      else if(kind==='quote'){
+        for(const wl of this._wrap(block[1], w-2)) out.push({k:'quote', text:wl});
+        out.push({k:'blank'});
+      }
+      else if(kind==='code'){ out.push({k:'code', text:block[1]}); }
+      else if(kind==='li'){ for(const wl of this._wrap('· '+block[1], w-2)) out.push({k:'li', text:wl}); }
+      else if(kind==='kv'){ out.push({k:'kv', text:block[1].padEnd(14,' ')+block[2]}); }
+      else if(kind==='hr'){ out.push({k:'rule'}); out.push({k:'blank'}); }
+      else if(kind==='link'){ out.push({k:'link', text:block[2], href:block[1]}); }
+      else if(kind==='app'){ out.push({k:'app', appId:block[1], text:block[2]}); }
+      else if(kind==='art'){ for(const ln of block[1]) out.push({k:'art', text:ln}); out.push({k:'blank'}); }
+    }
+    return out;
+  }
+  _wrap(text, w){
+    const words = text.split(/\s+/);
+    const out = [];
+    let cur = '';
+    for(const wd of words){
+      if((cur+' '+wd).trim().length > w){ if(cur) out.push(cur); cur = wd; }
+      else cur = (cur ? cur+' '+wd : wd);
+    }
+    if(cur) out.push(cur);
+    return out;
+  }
+  _drawLine(put, ln, c0, r, w, cs){
+    if(ln.k==='blank') return;
+    if(ln.k==='rule'){
+      for(let i=0;i<w;i++) put.put('─', c0+i, r, LOW, 0.5);
+      return;
+    }
+    if(ln.k==='h1'){
+      // multi-color heading
+      for(let i=0;i<ln.text.length;i++){
+        const col = ln.text[i]===' ' ? INK : RAINBOW[(i+Math.floor(t/16))%RAINBOW.length];
+        put.put(ln.text[i], c0+i, r, col, 1);
+      }
+      return;
+    }
+    if(ln.k==='h2'){ put.text(ln.text, c0, r, SUN, 1); return; }
+    if(ln.k==='h3'){ put.text(ln.text, c0, r, AQU, 0.95); return; }
+    if(ln.k==='p'){ put.text(ln.text, c0, r, INK, 0.95); return; }
+    if(ln.k==='code'){ put.text(ln.text.slice(0,w), c0, r, LIM, 0.95); return; }
+    if(ln.k==='li'){ put.text(ln.text, c0, r, PHERO, 0.95); return; }
+    if(ln.k==='kv'){
+      // split at first 14 cols → key
+      const key = ln.text.slice(0,14), val = ln.text.slice(14);
+      put.text(key, c0, r, CURSOR, 1);
+      put.text(val, c0+14, r, INK, 0.95);
+      return;
+    }
+    if(ln.k==='quote'){
+      put.put('▎', c0, r, VIO, 0.85);
+      put.text(ln.text, c0+2, r, VIO, 0.95);
+      return;
+    }
+    if(ln.k==='art'){ put.text(ln.text, c0, r, ACC, 0.9); return; }
+    if(ln.k==='link'){
+      const arrow = '→ ';
+      put.text(arrow, c0, r, MID, 0.7);
+      const hov = false; // no hover state for now
+      put.text(ln.text, c0+arrow.length, r, ACC, 0.95);
+      // underline on hover-like
+      for(let i=0;i<ln.text.length;i++) put.put('▁', c0+arrow.length+i, r, ACC, 0.4);
+      this.linkHits.push({
+        x:(c0)*cs, y:r*cs, w:(arrow.length+ln.text.length)*cs, h:cs,
+        action: ()=>this.navigate(ln.href),
+      });
+      return;
+    }
+    if(ln.k==='app'){
+      const a = appById(ln.appId);
+      const col = a ? (a.accent||HI) : HI;
+      put.put('▶', c0, r, col, 1);
+      put.text(' '+(a?a.label:ln.appId).padEnd(10,' ')+' '+ln.text, c0+1, r, INK, 0.95);
+      this.linkHits.push({
+        x:c0*cs, y:r*cs, w:w*cs, h:cs,
+        action:()=> a && spawnWindow(a),
+      });
+      return;
+    }
+  }
+  destroy(){}
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BUILT-IN APP: FILES (file manager — two-pane)
+// ─────────────────────────────────────────────────────────────────────────
+class Files {
+  constructor(){
+    // virtual filesystem — apps and real text files at the project root
+    this.root = {
+      kind:'dir', name:'characterworld', open:true, children:[
+        {kind:'app',  name:'charactershop/',   appId:'atelier'},
+        {kind:'app',  name:'characterfilm/',   appId:'film'},
+        {kind:'app',  name:'charactergrain/',  appId:'grain'},
+        {kind:'app',  name:'charactertracker/',appId:'tracker'},
+        {kind:'app',  name:'characterdelve/',  appId:'delve'},
+        {kind:'file', name:'README.md',        src:'README.md',  mime:'md'},
+        {kind:'file', name:'AGENTS.md',        src:'AGENTS.md',  mime:'md'},
+        {kind:'file', name:'CLAUDE.md',        src:'CLAUDE.md',  mime:'md'},
+        {kind:'dir',  name:'accessories', open:false, children:[
+          {kind:'app', name:'browser', appId:'browser'},
+          {kind:'app', name:'files',   appId:'files'},
+          {kind:'app', name:'calc',    appId:'calc'},
+          {kind:'app', name:'snake',   appId:'snake'},
+          {kind:'app', name:'sort',    appId:'sort'},
+          {kind:'app', name:'life',    appId:'life'},
+          {kind:'app', name:'term',    appId:'term'},
+          {kind:'app', name:'clock',   appId:'clock'},
+          {kind:'app', name:'about',   appId:'about'},
+        ]},
+        {kind:'dir',  name:'system', open:false, children:[
+          {kind:'file', name:'boot.log', text:bootLog()},
+          {kind:'file', name:'kernel.txt', text:'characterworld/os v0.6\n— every glyph a pixel —\nhandcrafted by willbear · 2026\n'},
+          {kind:'file', name:'palette.txt', text:Object.entries({HI,ACC,SUN,VIO,PNK,AQU,ORA,SKY,LIM,PHERO,WARN,CURSOR}).map(([k,v])=>k.padEnd(8,' ')+' '+v).join('\n')},
+        ]},
+      ]
+    };
+    this.selected = this.root.children[0];
+    this.scroll = 0;
+    this.preview = '';
+    this.previewLoading = false;
+    this.flatCache = null;
+    this.cacheKey = '';
+  }
+  mount(){
+    this.win.canvasEl.addEventListener('mousedown', (e)=>this._onClick(e));
+    this.win.canvasEl.addEventListener('wheel', (e)=>{
+      this.scroll = Math.max(0, this.scroll + Math.sign(e.deltaY));
+      e.preventDefault();
+    }, {passive:false});
+  }
+  resize(){}
+  _flatten(){
+    const key = this._dumpKey(this.root);
+    if(this.flatCache && this.cacheKey===key) return this.flatCache;
+    const out = [];
+    const walk = (n, depth)=>{
+      out.push({node:n, depth});
+      if(n.kind==='dir' && n.open) for(const c of n.children) walk(c, depth+1);
+    };
+    walk(this.root, 0);
+    this.flatCache = out;
+    this.cacheKey = key;
+    return out;
+  }
+  _dumpKey(n){
+    if(n.kind!=='dir') return n.name;
+    return n.name+'['+ (n.open?'o':'c') +':'+ n.children.map(c=>this._dumpKey(c)).join(',') +']';
+  }
+  _select(node){
+    this.selected = node;
+    this.preview = '';
+    if(node.kind==='file'){
+      if(node.text != null){ this.preview = node.text; return; }
+      if(node.src){
+        this.previewLoading = true;
+        fetch(node.src).then(r=>r.ok ? r.text() : Promise.reject(r.status))
+          .then(txt=>{ if(this.selected===node){ this.preview = txt; this.previewLoading=false; } })
+          .catch(err=>{ if(this.selected===node){ this.preview = '! could not load — '+err; this.previewLoading=false; } });
+      }
+    }
+  }
+  _onClick(e){
+    const r = this.win.canvasEl.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    for(const h of this.hits||[]){
+      if(x>=h.x && x<h.x+h.w && y>=h.y && y<h.y+h.h){ h.action(); return; }
+    }
+  }
+  onKey(e){
+    if(e.key==='ArrowDown'){ this.scroll++; e.preventDefault(); return true; }
+    if(e.key==='ArrowUp'){ this.scroll = Math.max(0, this.scroll-1); e.preventDefault(); return true; }
+    return false;
+  }
+  draw(){
+    const c = this.win.ctx;
+    const W = this.win.pixW, H = this.win.pixH;
+    c.fillStyle = BG; c.fillRect(0,0,W,H);
+    const cs = Math.max(11, Math.floor(Math.min(W/72, H/26)));
+    const put = makePut(c, cs);
+    const cols = Math.floor(W/cs), rows = Math.floor(H/cs);
+
+    // outer border
+    for(let cc=1;cc<cols-1;cc++){ put.put('═', cc, 0, MID, 0.8); put.put('═', cc, rows-1, MID, 0.8); }
+    for(let rr=1;rr<rows-1;rr++){ put.put('║', 0, rr, MID, 0.8); put.put('║', cols-1, rr, MID, 0.8); }
+    put.put('╔',0,0,MID,1); put.put('╗',cols-1,0,MID,1); put.put('╚',0,rows-1,MID,1); put.put('╝',cols-1,rows-1,MID,1);
+
+    // title
+    const titleStr = ' FILES · /'+this.root.name+' ';
+    put.text(titleStr, 2, 0, SUN, 1);
+
+    // split
+    const splitC = Math.max(20, Math.floor(cols*0.42));
+    for(let r=1; r<rows-1; r++) put.put('│', splitC, r, LOW, 0.6);
+    put.put('╤', splitC, 0, MID, 0.95);
+    put.put('╧', splitC, rows-1, MID, 0.95);
+
+    // ─── LEFT PANE: tree ───
+    this.hits = [];
+    const list = this._flatten();
+    const visible = rows - 4;
+    if(this.scroll > Math.max(0, list.length - visible)) this.scroll = Math.max(0, list.length - visible);
+    for(let li=0; li<visible && li+this.scroll<list.length; li++){
+      const {node, depth} = list[li+this.scroll];
+      const r = 2 + li;
+      const isSel = node===this.selected;
+      const indent = depth*2;
+      let glyph = '·', col = INK;
+      if(node.kind==='dir'){ glyph = node.open?'▾':'▸'; col = SUN; }
+      else if(node.kind==='app'){ glyph = '◆'; col = (appById(node.appId)||{accent:HI}).accent || HI; }
+      else if(node.kind==='file'){ glyph = '▤'; col = AQU; }
+      // selection bar
+      if(isSel){
+        c.fillStyle = col; c.globalAlpha = 0.14;
+        c.fillRect(2*cs, r*cs, (splitC-3)*cs, cs);
+        c.globalAlpha = 1;
+      }
+      const x0 = 2 + indent;
+      put.put(glyph, x0, r, col, 1);
+      const lbl = ' '+node.name;
+      const lblMax = splitC - 2 - x0 - 1;
+      put.text(lbl.slice(0, lblMax), x0+1, r, isSel ? col : INK, isSel?1:0.92);
+      this.hits.push({
+        x: 2*cs, y: r*cs, w: (splitC-3)*cs, h: cs,
+        action: ()=>{
+          if(this.selected===node && node.kind==='dir'){ node.open = !node.open; this.flatCache = null; }
+          else if(node.kind==='dir' && !node.open){ node.open = true; this.flatCache = null; this._select(node); }
+          else { this._select(node); }
+        },
+      });
+    }
+    // bottom-of-list scroll hint
+    if(list.length > visible){
+      put.text(' '+(this.scroll+1)+'/'+list.length+' ', 2, rows-2, MID, 0.7);
+    }
+
+    // ─── RIGHT PANE: preview / actions ───
+    const rx = splitC + 2;
+    const rw = cols - splitC - 4;
+    const sel = this.selected;
+    if(sel){
+      put.text(' '+sel.name+' ', rx, 1, sel.kind==='app' ? (appById(sel.appId)?.accent||HI) : sel.kind==='file' ? AQU : SUN, 1);
+      // separator
+      for(let cc=rx;cc<rx+rw;cc++) put.put('─', cc, 2, LOW, 0.5);
+
+      if(sel.kind==='app'){
+        const app = appById(sel.appId);
+        if(app){
+          // big ascii art rendered larger
+          for(let i=0;i<app.art.length;i++){
+            put.text(app.art[i], rx+2, 4+i, i%2 ? app.accent : (app.accent2||app.accent), 0.95);
+          }
+          put.text(app.label, rx+2, 8, app.accent, 1);
+          put.text(app.kind==='iframe' ? 'external program · '+app.src : 'built-in program', rx+2, 9, MID, 0.85);
+          // LAUNCH button
+          const btn = '  ▶ LAUNCH  ';
+          const bx = rx+2;
+          const by = 11;
+          for(let i=0;i<btn.length;i++) put.put(btn[i], bx+i, by, btn[i]==='▶'?LIM:INK, 1);
+          // border above & below
+          for(let i=0;i<btn.length;i++){ put.put('─', bx+i, by-1, app.accent, 0.7); put.put('─', bx+i, by+1, app.accent, 0.7); }
+          this.hits.push({
+            x: bx*cs, y:(by-1)*cs, w: btn.length*cs, h: 3*cs,
+            action: ()=>{ spawnWindow(app); },
+          });
+          // also offer "open in window from FILES" hint
+          put.text('return on a row to expand · click LAUNCH to run', rx+2, by+3, MID, 0.55);
+        }
+      } else if(sel.kind==='file'){
+        if(this.previewLoading){
+          put.text('loading…', rx+2, 4, CURSOR, 0.9);
+        } else {
+          const lines = (this.preview||'').split('\n');
+          const max = rows - 5;
+          for(let i=0;i<Math.min(lines.length, max); i++){
+            const ln = lines[i].slice(0, rw-2);
+            // markdown-ish coloring
+            let col = INK, a = 0.92;
+            if(ln.startsWith('# ')) { col = SUN; a = 1; }
+            else if(ln.startsWith('## ')) { col = LIM; a = 1; }
+            else if(ln.startsWith('### ')) { col = AQU; a = 0.95; }
+            else if(/^\s*[-*]\s/.test(ln)){ col = PHERO; }
+            else if(/^\s*```/.test(ln)){ col = MID; a = 0.6; }
+            else if(/^>/.test(ln)){ col = VIO; a = 0.85; }
+            put.text(ln, rx+2, 4+i, col, a);
+          }
+          if(lines.length > max){
+            put.text('… '+(lines.length-max)+' more lines …', rx+2, 4+max, MID, 0.6);
+          }
+        }
+      } else if(sel.kind==='dir'){
+        put.text('directory · '+sel.children.length+' items', rx+2, 4, INK, 0.95);
+        put.text(sel.open ? '▾ open  (click row again to close)' : '▸ closed (click row to open)', rx+2, 6, MID, 0.8);
+      }
+    }
+  }
+  destroy(){}
+}
+function bootLog(){
+  const lines = [
+    '[ OK ] mounting / from typeface ROM',
+    '[ OK ] starting wallpaper:mycelium',
+    '[ OK ] starting taskbar:sort',
+    '[ OK ] grain palette loaded — 12 hues',
+    '[ OK ] window manager up',
+    '[ OK ] start menu ready',
+    '[ OK ] characterworld/os v0.6',
+    '',
+    'login: visitor',
+    'no password required',
+    '',
+    'every glyph a pixel.',
+  ];
+  return lines.join('\n');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BUILT-IN APP: SORTER (live sort visualizer in its own window)
+// ─────────────────────────────────────────────────────────────────────────
+class Sorter {
+  constructor(){
+    this.N = 48;
+    this.algo = 'bubble';
+    this.reset();
+    this.compares = 0;
+    this.swaps = 0;
+    this.tickRate = 1;
+    this.algos = ['bubble','insertion','selection','cocktail'];
+  }
+  reset(){
+    this.arr = [];
+    for(let i=1;i<=this.N;i++) this.arr.push(i);
+    // shuffle
+    for(let k=this.arr.length-1;k>0;k--){
+      const r = Math.floor(Math.random()*(k+1));
+      [this.arr[k], this.arr[r]] = [this.arr[r], this.arr[k]];
+    }
+    this.i = 0; this.j = 0; this.minI = 0; this.dir = 1;
+    this.compares = 0; this.swaps = 0;
+    this.done = false;
+  }
+  setAlgo(name){ this.algo = name; this.reset(); }
+  step(){
+    if(this.done) return;
+    const a = this.arr;
+    if(this.algo==='bubble'){
+      if(this.j >= a.length - 1 - this.i){ this.j=0; this.i++; if(this.i>=a.length-1){ this.done=true; return; } }
+      this.compares++;
+      if(a[this.j] > a[this.j+1]){ [a[this.j],a[this.j+1]] = [a[this.j+1],a[this.j]]; this.swaps++; }
+      this.j++;
+    } else if(this.algo==='insertion'){
+      if(this.i===0) this.i = 1;
+      if(this.i >= a.length){ this.done=true; return; }
+      if(this.j===null) this.j = this.i;
+      this.compares++;
+      if(this.j>0 && a[this.j-1] > a[this.j]){
+        [a[this.j-1], a[this.j]] = [a[this.j], a[this.j-1]];
+        this.swaps++;
+        this.j--;
+      } else {
+        this.i++; this.j = this.i;
+      }
+    } else if(this.algo==='selection'){
+      if(this.i >= a.length-1){ this.done=true; return; }
+      if(this.j===0 || this.j === undefined) this.j = this.i;
+      this.compares++;
+      if(a[this.j] < a[this.minI]) this.minI = this.j;
+      this.j++;
+      if(this.j >= a.length){
+        if(this.minI !== this.i){ [a[this.i],a[this.minI]] = [a[this.minI],a[this.i]]; this.swaps++; }
+        this.i++; this.j = this.i; this.minI = this.i;
+      }
+    } else if(this.algo==='cocktail'){
+      // simplified
+      this.compares++;
+      if(this.dir>0){
+        if(this.j >= a.length-1 - this.i){ this.dir = -1; this.j -= 1; return; }
+        if(a[this.j] > a[this.j+1]){ [a[this.j],a[this.j+1]] = [a[this.j+1],a[this.j]]; this.swaps++; }
+        this.j++;
+      } else {
+        if(this.j <= this.i){ this.dir = 1; this.i++; if(this.i >= a.length-1){ this.done=true; return; } return; }
+        if(a[this.j-1] > a[this.j]){ [a[this.j-1],a[this.j]] = [a[this.j],a[this.j-1]]; this.swaps++; }
+        this.j--;
+      }
+    }
+  }
+  mount(){
+    this.win.canvasEl.addEventListener('mousedown', (e)=>this._click(e));
+  }
+  resize(){}
+  _click(e){
+    const r = this.win.canvasEl.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    for(const h of this.hits||[]){
+      if(x>=h.x && x<h.x+h.w && y>=h.y && y<h.y+h.h){ h.action(); return; }
+    }
+  }
+  onKey(e){
+    if(e.key===' '){ this.reset(); e.preventDefault(); return true; }
+    if(e.key==='+' || e.key==='='){ this.tickRate = Math.min(20, this.tickRate+1); return true; }
+    if(e.key==='-'){ this.tickRate = Math.max(1, this.tickRate-1); return true; }
+    return false;
+  }
+  draw(){
+    for(let s=0; s<this.tickRate; s++) this.step();
+    const c = this.win.ctx;
+    const W = this.win.pixW, H = this.win.pixH;
+    c.fillStyle = BG; c.fillRect(0,0,W,H);
+    const cs = Math.max(10, Math.floor(Math.min(W/(this.N+6), H/24)));
+    const put = makePut(c, cs);
+    const cols = Math.floor(W/cs), rows = Math.floor(H/cs);
+
+    // border
+    for(let cc=1;cc<cols-1;cc++){ put.put('═', cc, 0, MID, 0.8); put.put('═', cc, rows-1, MID, 0.8); }
+    for(let rr=1;rr<rows-1;rr++){ put.put('║', 0, rr, MID, 0.8); put.put('║', cols-1, rr, MID, 0.8); }
+    put.put('╔',0,0,MID,1); put.put('╗',cols-1,0,MID,1); put.put('╚',0,rows-1,MID,1); put.put('╝',cols-1,rows-1,MID,1);
+
+    put.text(' SORT · '+this.algo+' ', 2, 0, AQU, 1);
+
+    // bars area
+    const x0 = 3;
+    const y0 = 2;
+    const barH = rows - 6;
+    const maxV = this.N;
+    for(let i=0;i<this.arr.length && x0+i<cols-3;i++){
+      const v = this.arr[i];
+      const h = Math.max(1, Math.floor((v/maxV)*barH));
+      // color by value
+      const huePos = (v-1) / (maxV-1);
+      const col = RAINBOW[Math.floor(huePos*(RAINBOW.length-1))];
+      // highlight active indices
+      const hot = (i===this.j || i===this.j+1 || i===this.i);
+      for(let r=0;r<h;r++){
+        const y = y0 + barH - 1 - r;
+        const ch = (r === h-1) ? '▔' : (r === 0 ? '▁' : '█');
+        put.put(ch, x0+i, y, hot ? CURSOR : col, hot ? 1 : 0.92);
+      }
+    }
+
+    // controls row
+    const cy = rows - 3;
+    let cx = 2;
+    this.hits = [];
+    for(const algo of this.algos){
+      const lbl = '['+algo+']';
+      const col = algo===this.algo ? CURSOR : MID;
+      put.text(lbl, cx, cy, col, algo===this.algo?1:0.85);
+      this.hits.push({x:cx*cs, y:cy*cs, w:lbl.length*cs, h:cs, action:()=>this.setAlgo(algo)});
+      cx += lbl.length + 1;
+    }
+    const reset = '[ ↻ shuffle ]';
+    put.text(reset, cx, cy, LIM, 0.95);
+    this.hits.push({x:cx*cs, y:cy*cs, w:reset.length*cs, h:cs, action:()=>this.reset()});
+    // stats
+    const stats = 'compares '+this.compares+'  swaps '+this.swaps+'  speed ×'+this.tickRate+(this.done?'  · done':'');
+    put.text(stats, 2, rows-2, MID, 0.8);
+  }
+  destroy(){}
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BUILT-IN APP: ABOUT (README)
+// ─────────────────────────────────────────────────────────────────────────
+class About {
+  constructor(){
+    this.lines = [
+      '',
+      '  ░▒▓ CHARACTERWORLD/OS ▓▒░',
+      '',
+      '  a tiny operating system from a timeline that',
+      '  never invented pixels. every visible form here is',
+      '  a typed glyph: ascii, unicode, box drawing, blocks.',
+      '',
+      '  ─ programs ─',
+      '    ATELIER   photoshop-style character paint',
+      '    FILM      character-only video editor',
+      '    GRAIN     generative granular synth',
+      '    TRACKER   16-voice breakcore tracker',
+      '    DELVE     character-only roguelike',
+      '',
+      '  ─ accessories ─',
+      '    BROWSER   character-only hypertext (CHAR-NET)',
+      '    FILES     two-pane file manager',
+      '    CALC      4-function calculator',
+      '    SNAKE     classic, with glyph walls',
+      '    SORT      live sort visualizer · 4 algos',
+      '    LIFE      conway · paintable · with R-pent',
+      '    TERM      shell w/ ls, cat, open, sl, ...',
+      '    CLOCK     analog face + multi-zone',
+      '',
+      '  ─ shortcuts ─',
+      '    drag desktop icons to rearrange',
+      '    right-click anywhere for context menu',
+      '    click START or press CTRL+S',
+      '    CTRL+1..0   open the nth program',
+      '    F1          open the github repo',
+      '',
+      '  every glyph a pixel · willbear · 2026',
+      '',
+    ];
+  }
+  mount(){}
+  resize(){}
+  onKey(){ return false }
+  draw(){
+    const c = this.win.ctx;
+    const W = this.win.pixW, H = this.win.pixH;
+    c.fillStyle = BG; c.fillRect(0,0,W,H);
+    const cs = Math.max(11, Math.floor(Math.min(W/52, H/(this.lines.length+2))));
+    const put = makePut(c, cs);
+    const cols = Math.floor(W/cs), rows = Math.floor(H/cs);
+    // border
+    for(let cc=1;cc<cols-1;cc++){ put.put('═', cc, 0, MID, 0.8); put.put('═', cc, rows-1, MID, 0.8); }
+    for(let rr=1;rr<rows-1;rr++){ put.put('║', 0, rr, MID, 0.8); put.put('║', cols-1, rr, MID, 0.8); }
+    put.put('╔',0,0,MID,1); put.put('╗',cols-1,0,MID,1); put.put('╚',0,rows-1,MID,1); put.put('╝',cols-1,rows-1,MID,1);
+    // text
+    for(let i=0;i<this.lines.length && i<rows-2;i++){
+      const ln = this.lines[i];
+      const col = ln.includes('CHARACTERWORLD') ? ACCENT : ln.startsWith('  ─') ? MID : HI;
+      put.text(ln.slice(0, cols-2), 1, i+1, col, ln.startsWith('  ─')?0.85:1);
+    }
+  }
+  destroy(){}
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CURSOR overlay on bg
+// ─────────────────────────────────────────────────────────────────────────
+function drawCursor(){
+  if(mouseC<0||mouseR<0) return;
+  // skip cursor when over a window (the OS cursor takes over)
+  for(const w of windows){
+    const x = w.x, y = w.y, ww = w.w, hh = w.h;
+    if(mouseX>=x && mouseX<x+ww && mouseY>=y && mouseY<y+hh) return;
+  }
+  const ic = iconAt(mouseC, mouseR);
+  const onTask = mouseR === rows-1;
+  const mark = ic ? '◈' : onTask ? '▔' : '+';
+  const col = ic ? ACCENT : HI;
+  putBg.put(mark, mouseC, mouseR, col, 0.7+0.3*Math.sin(t*0.2));
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BOOT ANIMATION — quick CRT-flash + scrolling boot log on cold start.
+// suppressible via localStorage so it only plays the first time per tab session.
+// ─────────────────────────────────────────────────────────────────────────
+let bootT = 0;
+let bootOn = !sessionStorage.getItem('cwos.booted');
+const BOOT_LINES = [
+  '[    0.000 ] characterworld/os v0.6 — every glyph a pixel',
+  '[    0.012 ] mounting / from typeface ROM',
+  '[    0.034 ] loading palette: HI ACC SUN VIO PNK AQU ORA SKY LIM PHERO',
+  '[    0.061 ] starting wallpaper:mycelium · seeds spawned',
+  '[    0.082 ] starting taskbar:sort · 18 bars · forever',
+  '[    0.110 ] window manager up',
+  '[    0.142 ] start menu loaded',
+  '[    0.183 ] /bin/term ready',
+  '[    0.220 ] /bin/life — conway initialised',
+  '[    0.255 ] CHAR-NET reachable · char://home',
+  '[    0.301 ] no password required',
+  '[    0.342 ] welcome, visitor.',
+];
+function drawBoot(){
+  if(!bootOn) return;
+  bootT++;
+  // fade-in flash for first ~10 frames, then scroll log, then fade-out
+  ctx.fillStyle = BG; ctx.fillRect(0,0,bg.width,bg.height);
+  // crackle background
+  for(let r=0;r<rows;r+=2){
+    for(let c=0;c<cols;c++){
+      if(Math.random()<0.04){
+        const ch = '░▒▓·.'[Math.floor(Math.random()*5)];
+        putBg.put(ch, c, r, MID, 0.18);
+      }
+    }
+  }
+  const totalDur = 130;
+  const opacity = bootT < 8 ? bootT/8 : (bootT > totalDur-12 ? Math.max(0,(totalDur-bootT)/12) : 1);
+  ctx.globalAlpha = opacity;
+  // big banner
+  const banner = 'CHARACTERWORLD/OS';
+  const bc = Math.floor((cols - banner.length)/2);
+  for(let i=0;i<banner.length;i++){
+    const col = banner[i]===' '? INK : RAINBOW[(i + Math.floor(bootT/3))%RAINBOW.length];
+    putBg.put(banner[i], bc+i, 4, col, 1);
+  }
+  putBg.text('— every glyph a pixel —', Math.floor((cols-23)/2), 6, MID, 0.85);
+
+  // scrolling boot log
+  const logTop = 9;
+  const linesShown = Math.min(BOOT_LINES.length, Math.floor((bootT-8)/6));
+  for(let i=0;i<linesShown;i++){
+    const ln = BOOT_LINES[i];
+    const ageF = (bootT - 8 - i*6) / 30;
+    const a = Math.min(1, ageF*1.5);
+    // colorize first bracket part
+    const m = ln.match(/^(\[.*?\])\s*(.*)$/);
+    if(m){
+      putBg.text(m[1], 4, logTop+i, LIM, 0.85*a);
+      putBg.text(' '+m[2], 4+m[1].length, logTop+i, INK, 0.95*a);
+    } else putBg.text(ln, 4, logTop+i, INK, 0.95*a);
+  }
+  // progress bar
+  const barW = Math.max(20, Math.min(60, cols-12));
+  const barC = Math.floor((cols - barW)/2);
+  const barR = logTop + BOOT_LINES.length + 2;
+  const fill = Math.min(barW, Math.floor((bootT - 8) * barW / 90));
+  for(let i=0;i<barW;i++){
+    const filled = i < fill;
+    const col = filled ? RAINBOW[(i+Math.floor(bootT/2))%RAINBOW.length] : DIM;
+    putBg.put(filled?'█':'░', barC+i, barR, col, 1);
+  }
+  putBg.text('['+fill+'/'+barW+']', barC+barW+2, barR, MID, 0.85);
+  ctx.globalAlpha = 1;
+  if(bootT > totalDur){
+    bootOn = false;
+    try{ sessionStorage.setItem('cwos.booted','1'); }catch(_){}
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// MAIN LOOP
+// ─────────────────────────────────────────────────────────────────────────
+resize();
+icons = loadIcons();
+
+function loop(){
+  t++;
+  // bg
+  ctx.fillStyle = BG; ctx.fillRect(0,0,bg.width,bg.height);
+  if(bootOn){
+    drawBoot();
+    requestAnimationFrame(loop);
+    return;
+  }
+  drawWallpaper();
+  for(const ic of icons) drawIcon(ic);
+  drawTaskbar();
+  drawStartMenu();
+  drawCtxMenu();
+  drawCursor();
+
+  // built-in window draws
+  for(const w of windows){
+    if(w.minimized) continue;
+    if(w.kind==='builtin' && w.instance && w.instance.draw){
+      w.instance.draw();
+    }
+  }
+
+  requestAnimationFrame(loop);
+}
+loop();
+
+// open ABOUT once on first visit, as a welcome
+const FIRSTRUN_KEY = 'cwos.firstrun.v1';
+if(!localStorage.getItem(FIRSTRUN_KEY)){
+  setTimeout(()=>{ spawnWindow(appById('about'), {w:520,h:520}); }, 350);
+  try{ localStorage.setItem(FIRSTRUN_KEY, '1'); }catch(_){}
+}
+
 })();
 </script>
 </body>
