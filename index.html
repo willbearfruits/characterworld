@@ -10,7 +10,7 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="characterworld/os">
 <meta property="og:description" content="A character-only desktop OS. Drag icons. Open windows. Run programs.">
-<meta property="og:image" content="https://willbearfruits.github.io/characterworld/charactershop/og.png">
+<meta property="og:image" content="https://willbearfruits.github.io/characterworld/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="https://willbearfruits.github.io/characterworld/">
@@ -18,7 +18,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="characterworld/os">
 <meta name="twitter:description" content="A character-only desktop OS.">
-<meta name="twitter:image" content="https://willbearfruits.github.io/characterworld/charactershop/og.png">
+<meta name="twitter:image" content="https://willbearfruits.github.io/characterworld/og.png">
 <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20fill%3D%22%23030403%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2254%22%20text-anchor%3D%22middle%22%20font-family%3D%22Courier%20New%2Cmonospace%22%20font-size%3D%2256%22%20font-weight%3D%22bold%22%20fill%3D%22%23fff16a%22%3E%E2%8C%96%3C%2Ftext%3E%3C%2Fsvg%3E">
 <style>
   :root{
@@ -1681,7 +1681,10 @@ const PAGES = {
       ['h2',   'welcome, visitor.'],
       ['p',    'CHAR-NET is the public hypertext of CHARACTERWORLD/OS.'],
       ['p',    'no images. no scripts. no iframes. every page is type.'],
-      ['p',    'pick a page below. or punch a char:// url into the bar.'],
+      ['p',    'pick a page below — or punch any url into the bar:'],
+      ['p',    '  · char://*  for in-universe pages'],
+      ['p',    '  · https://* for the wider net (fetched as text and rendered as glyphs)'],
+      ['p',    '  · free text  to search the duck'],
       ['hr'],
       ['h3',   '— index —'],
       ['link', 'char://manifesto',  'the manifesto'],
@@ -1837,22 +1840,55 @@ class Browser {
     this.editing = false;
     this.scroll = 0;
     this.bookmarks = [
-      {label:'HOME',     url:'char://home'},
-      {label:'MANIFEST', url:'char://manifesto'},
-      {label:'ATLAS',    url:'char://atlas'},
-      {label:'GLYPHS',   url:'char://glyphs'},
-      {label:'NEWS',     url:'char://news'},
-      {label:'KEYS',     url:'char://shortcuts'},
+      {label:'HOME',    url:'char://home'},
+      {label:'ATLAS',   url:'char://atlas'},
+      {label:'GLYPHS',  url:'char://glyphs'},
+      {label:'WIKI',    url:'https://en.wikipedia.org/wiki/ASCII_art'},
+      {label:'HN',      url:'https://news.ycombinator.com/'},
+      {label:'WIBY',    url:'https://wiby.me/'},
+      {label:'NEOCITY', url:'https://neocities.org/'},
     ];
     this.hits = [];
     this.linkHits = [];
+    this.fetched = null;   // {url, lines: [...] } when last fetch succeeded
+    this.loading = false;
+    this.error = null;
   }
   _normalize(u){
     u = (u||'').trim();
     if(!u) return '';
     if(u.startsWith('char://')) return u;
-    if(/^[a-z]+:/i.test(u)) return u;
-    return 'char://' + u;
+    if(u.startsWith('app://')) return u;
+    if(/^https?:\/\//i.test(u)) return u;
+    if(u.startsWith('//')) return 'https:'+u;
+    // looks like a domain → assume https
+    if(/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(u)) return 'https://'+u;
+    // free text → search the duck via jina (rendered as text)
+    return 'https://duckduckgo.com/html/?q='+encodeURIComponent(u);
+  }
+  async _fetchWeb(url){
+    this.loading = true;
+    this.error = null;
+    this.fetched = null;
+    this.scroll = 0;
+    const fetchUrl = url;
+    try {
+      // r.jina.ai is a CORS-friendly text-extraction service that returns
+      // markdown for any URL. perfect for the typewritten internet.
+      const r = await fetch('https://r.jina.ai/'+url, {
+        headers: {'Accept':'text/markdown, text/plain;q=0.9, */*;q=0.5'},
+      });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const text = await r.text();
+      // ignore stale responses if user navigated away in the meantime
+      if(this.url !== fetchUrl) return;
+      this.fetched = { url, body: text.slice(0, 80_000) };
+    } catch(e){
+      if(this.url !== fetchUrl) return;
+      this.error = (e && e.message) ? e.message : String(e);
+    } finally {
+      if(this.url === fetchUrl) this.loading = false;
+    }
   }
   mount(){
     this.win.canvasEl.addEventListener('mousedown', (e)=>this._onClick(e));
@@ -1880,10 +1916,33 @@ class Browser {
     this.input = u;
     this.scroll = 0;
     this.editing = false;
+    this.fetched = null;
+    this.error = null;
+    this.loading = false;
+    if(/^https?:\/\//i.test(u)) this._fetchWeb(u);
   }
-  back(){ if(this.histIdx>0){ this.histIdx--; this.url = this.input = this.history[this.histIdx]; this.scroll = 0; } }
-  forward(){ if(this.histIdx<this.history.length-1){ this.histIdx++; this.url = this.input = this.history[this.histIdx]; this.scroll = 0; } }
-  reload(){ this.scroll = 0; }
+  back(){
+    if(this.histIdx>0){
+      this.histIdx--;
+      this.url = this.input = this.history[this.histIdx];
+      this.scroll = 0;
+      this.fetched = null; this.error = null;
+      if(/^https?:\/\//i.test(this.url)) this._fetchWeb(this.url);
+    }
+  }
+  forward(){
+    if(this.histIdx<this.history.length-1){
+      this.histIdx++;
+      this.url = this.input = this.history[this.histIdx];
+      this.scroll = 0;
+      this.fetched = null; this.error = null;
+      if(/^https?:\/\//i.test(this.url)) this._fetchWeb(this.url);
+    }
+  }
+  reload(){
+    this.scroll = 0;
+    if(/^https?:\/\//i.test(this.url)) this._fetchWeb(this.url);
+  }
   onKey(e){
     if(this.editing){
       if(e.key==='Enter'){ this.editing=false; this.navigate(this.input); e.preventDefault(); return true; }
@@ -1973,15 +2032,45 @@ class Browser {
     for(let i=1;i<cols-1;i++) put.put('─', i, 3, LOW, 0.5);
 
     // ── content area: render the page ──
-    const page = PAGES[this.url] || PAGES['char://404'];
     const contentR0 = 5, contentR1 = rows - 3;
     const contentW = cols - 6;
-    const lines = this._layout(page, contentW);
+    let lines;
+    let pageTitle;
+    if(this.url.startsWith('char://')){
+      const page = PAGES[this.url] || PAGES['char://404'];
+      pageTitle = page.title;
+      lines = this._layout(page, contentW);
+    } else if(this.loading){
+      pageTitle = 'fetching ' + this.url;
+      const dots = '·'.repeat(1 + Math.floor(t/15)%4);
+      lines = [
+        {k:'blank'},
+        {k:'h2', text:'fetching · '+this.url},
+        {k:'p',  text:'asking the typewritten ether for this page '+dots},
+        {k:'p',  text:'(text comes back; pixels do not.)'},
+      ];
+    } else if(this.error){
+      pageTitle = 'fetch failed';
+      lines = [
+        {k:'blank'},
+        {k:'h2', text:'fetch failed'},
+        {k:'p',  text:this.error},
+        {k:'p',  text:'the wider net sometimes refuses to be typed.'},
+        {k:'link', text:'try again', href:this.url},
+        {k:'link', text:'go home',   href:'char://home'},
+      ];
+    } else if(this.fetched){
+      pageTitle = this.url;
+      lines = this._layoutWeb(this.fetched.body, contentW);
+    } else {
+      pageTitle = this.url;
+      lines = [{k:'p', text:'(empty)'}];
+    }
     const visible = contentR1 - contentR0;
     if(this.scroll > Math.max(0, lines.length - visible)) this.scroll = Math.max(0, lines.length - visible);
 
     // page title strip
-    put.text(' '+page.title+' ', 3, 4, INK, 1);
+    put.text(' '+pageTitle.slice(0, cols-6)+' ', 3, 4, INK, 1);
     // a thin bar of accent colors
     for(let i=0;i<cols-6;i++){
       const col = RAINBOW[(i + Math.floor(t/40)) % RAINBOW.length];
@@ -2045,6 +2134,97 @@ class Browser {
     if(cur) out.push(cur);
     return out;
   }
+  _layoutWeb(text, w){
+    // r.jina.ai returns markdown, often prefixed with "Title: ..." and
+    // "URL Source: ..." headers. parse it into our line model.
+    const out = [];
+    const raw = text.replace(/\r/g,'').split('\n');
+    let i = 0;
+    let title = '', url = '';
+    // strip jina header
+    while(i < raw.length){
+      const ln = raw[i];
+      if(/^Title:\s*/.test(ln)){ title = ln.replace(/^Title:\s*/, ''); i++; continue; }
+      if(/^URL Source:\s*/.test(ln)){ url = ln.replace(/^URL Source:\s*/, ''); i++; continue; }
+      if(/^Markdown Content:\s*$/.test(ln)){ i++; continue; }
+      if(/^Published Time:/.test(ln) || /^Description:/.test(ln) || /^Warning:/.test(ln) || /^Image \d+:/.test(ln)){ i++; continue; }
+      if(ln.trim()==='') { i++; continue; }
+      break;
+    }
+    if(title){ out.push({k:'h1', text: title.toUpperCase()}); out.push({k:'rule'}); out.push({k:'blank'}); }
+    if(url) { out.push({k:'meta', text: url}); out.push({k:'blank'}); }
+    let inCode = false;
+    for(; i<raw.length; i++){
+      let ln = raw[i];
+      if(/^```/.test(ln)){ inCode = !inCode; out.push({k:'rule'}); continue; }
+      if(inCode){ out.push({k:'code', text: ln}); continue; }
+      if(/^\s*$/.test(ln)){ out.push({k:'blank'}); continue; }
+      if(/^# /.test(ln)){ out.push({k:'h1', text: ln.slice(2)}); out.push({k:'rule'}); continue; }
+      if(/^## /.test(ln)){ out.push({k:'h2', text: ln.slice(3)}); continue; }
+      if(/^### /.test(ln)){ out.push({k:'h3', text: ln.slice(4)}); continue; }
+      if(/^#### /.test(ln)){ out.push({k:'h3', text: ln.slice(5)}); continue; }
+      if(/^>\s?/.test(ln)){
+        for(const wl of this._wrap(ln.replace(/^>\s?/,''), w-2)) out.push({k:'quote', text: wl});
+        continue;
+      }
+      if(/^[-*]\s/.test(ln)){
+        const item = ln.replace(/^[-*]\s/, '');
+        const segs = this._splitMd(item);
+        const wrapped = this._wrapSegs([{t:'· ', s:'plain'}].concat(segs), w-2);
+        for(const wl of wrapped) out.push({k:'liseg', segs:wl});
+        continue;
+      }
+      if(/^\s{4,}|\t/.test(ln)){
+        out.push({k:'code', text: ln.replace(/^\s{4}/, '')}); continue;
+      }
+      if(/^\|/.test(ln)){
+        // markdown table row → render as plain
+        out.push({k:'code', text: ln}); continue;
+      }
+      if(/^---+$/.test(ln) || /^\*\*\*+$/.test(ln)){ out.push({k:'rule'}); continue; }
+      // inline → segments (may contain links)
+      const segs = this._splitMd(ln);
+      const wrapped = this._wrapSegs(segs, w);
+      for(const wl of wrapped) out.push({k:'pseg', segs:wl});
+    }
+    return out;
+  }
+  _splitMd(text){
+    // splits a line into [{t,s}] where s = 'plain'|'link'|'bold'|'em'|'code', t = visible text, h = href if link
+    const out = [];
+    let i = 0;
+    const re = /(\[([^\]]+)\]\(([^)]+)\))|(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(https?:\/\/\S+)/;
+    while(i < text.length){
+      const sub = text.slice(i);
+      const m = sub.match(re);
+      if(!m){ out.push({t:sub, s:'plain'}); break; }
+      if(m.index > 0) out.push({t: sub.slice(0, m.index), s:'plain'});
+      if(m[1]) out.push({t:m[2], s:'link', h:m[3]});
+      else if(m[4]) out.push({t:m[5], s:'bold'});
+      else if(m[6]) out.push({t:m[7], s:'em'});
+      else if(m[8]) out.push({t:m[9], s:'code'});
+      else if(m[10]) out.push({t:m[10], s:'link', h:m[10]});
+      i += m.index + m[0].length;
+    }
+    return out.filter(o=>o.t);
+  }
+  _wrapSegs(segs, w){
+    // wrap segments into lines of width w, preserving styles
+    const out = [[]];
+    let curLen = 0;
+    for(const seg of segs){
+      const words = seg.t.split(/(\s+)/);
+      for(const wd of words){
+        if(!wd) continue;
+        if(curLen + wd.length > w && wd.trim()){
+          out.push([]); curLen = 0;
+        }
+        out[out.length-1].push({t:wd, s:seg.s, h:seg.h});
+        curLen += wd.length;
+      }
+    }
+    return out.filter(line => line.some(s=>s.t.trim().length));
+  }
   _drawLine(put, ln, c0, r, w, cs){
     if(ln.k==='blank') return;
     if(ln.k==='rule'){
@@ -2099,6 +2279,33 @@ class Browser {
         x:c0*cs, y:r*cs, w:w*cs, h:cs,
         action:()=> a && spawnWindow(a),
       });
+      return;
+    }
+    if(ln.k==='meta'){ put.text(ln.text.slice(0,w), c0, r, MID, 0.7); return; }
+    if(ln.k==='pseg' || ln.k==='liseg'){
+      let cx = c0;
+      for(const seg of ln.segs){
+        if(!seg.t) continue;
+        const remaining = w - (cx - c0);
+        if(remaining <= 0) break;
+        const visible = seg.t.slice(0, remaining);
+        let col = INK, a = 0.95;
+        if(seg.s==='link'){ col = ACC; a = 1; }
+        else if(seg.s==='bold'){ col = LIM; a = 1; }
+        else if(seg.s==='em'){ col = SUN; a = 0.95; }
+        else if(seg.s==='code'){ col = LIM; a = 0.95; }
+        put.text(visible, cx, r, col, a);
+        if(seg.s==='link' && seg.h){
+          // underline + register hit
+          for(let i=0;i<visible.length;i++) put.put('▁', cx+i, r, ACC, 0.4);
+          this.linkHits.push({
+            x:cx*cs, y:r*cs, w:visible.length*cs, h:cs,
+            action: ()=>this.navigate(seg.h),
+          });
+        }
+        cx += visible.length;
+        if(cx - c0 >= w) break;
+      }
       return;
     }
   }
@@ -2647,6 +2854,31 @@ function drawBoot(){
 // ─────────────────────────────────────────────────────────────────────────
 resize();
 icons = loadIcons();
+
+// ─── OG / screenshot mode (?og=1) — skip boot, pre-grow mycelium, lay out
+// ─── two windows for a clean social-card frame.
+const OG_MODE = typeof location !== 'undefined' && location.search.includes('og=1');
+if(OG_MODE){
+  bootOn = false;
+  mouseC = -1; mouseR = -1;
+  // pre-step mycelium so wallpaper has presence
+  mycInit();
+  for(let i=0;i<140;i++) mycStep();
+  // open BROWSER on the left, LIFE on the right
+  setTimeout(()=>{
+    const W = window.innerWidth, H = window.innerHeight;
+    const bw = Math.floor(W*0.46), bh = Math.floor(H*0.62);
+    const lw = Math.floor(W*0.40), lh = Math.floor(H*0.55);
+    const browser = spawnWindow(appById('browser'), { x: Math.floor(W*0.04), y: Math.floor(H*0.18), w: bw, h: bh });
+    const life    = spawnWindow(appById('life'),    { x: Math.floor(W*0.55), y: Math.floor(H*0.10), w: lw, h: lh });
+    // give Life some time to evolve
+    if(life.instance && life.instance.step){ for(let i=0;i<8;i++) life.instance.step(); }
+    // re-focus browser so it has the accent ring
+    focusWindow(browser);
+    // mark global so a screenshot tool can poll
+    window.__og_ready = true;
+  }, 100);
+}
 
 function loop(){
   t++;
