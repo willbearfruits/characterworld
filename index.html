@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>characterworld/os</title>
 <meta name="description" content="CHARACTERWORLD/OS — a character-only desktop. Drag icons. Open windows. Run programs. Every glyph a pixel.">
 <meta name="author" content="willbear / glitches">
@@ -75,6 +75,16 @@
     color:var(--low);font-size:14px;line-height:14px;text-align:right;padding-right:2px;
   }
   .resizer:hover{color:var(--accent)}
+  /* ── mobile ────────────────────────────────────────────────────────── */
+  body.mobile{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  body.mobile .titlebar{height:30px;line-height:30px;font-size:15px;cursor:default}
+  body.mobile .titlebar .ctrl.min,
+  body.mobile .titlebar .ctrl.max{display:none}
+  body.mobile .titlebar .ctrl.close{font-size:22px;padding:0 10px}
+  body.mobile .titlebar .glyph{display:none}
+  body.mobile .resizer{display:none}
+  body.mobile .win{box-shadow:none;border-top:1px solid var(--low)}
+  body.mobile #bg{cursor:default}
 </style>
 </head>
 <body>
@@ -120,6 +130,18 @@ let zTop=100;
 let startMenuOpen=false;
 let dragOp=null; // {kind:'icon'|'window'|'resize', ...}
 
+// ─── MOBILE MODE — pointer:coarse + small viewport → phone-style shell
+let IS_MOBILE = false;
+function detectMobile(){
+  const minDim = Math.min(window.innerWidth, window.innerHeight);
+  const wasM = IS_MOBILE;
+  IS_MOBILE = (matchMedia('(pointer: coarse)').matches && minDim < 900) || matchMedia('(max-width: 720px)').matches;
+  if(IS_MOBILE) document.body.classList.add('mobile');
+  else document.body.classList.remove('mobile');
+  return wasM !== IS_MOBILE;
+}
+detectMobile();
+
 // ─────────────────────────────────────────────────────────────────────────
 // helpers
 // ─────────────────────────────────────────────────────────────────────────
@@ -161,13 +183,35 @@ function resize(){
   popups.width=w*dpr; popups.height=h*dpr;
   popups.style.width=w+'px'; popups.style.height=h+'px';
   pctx.setTransform(dpr,0,0,dpr,0,0);
-  cell = Math.max(11, Math.min(18, Math.floor(Math.min(w,h)/52)));
+  const wasMobile = IS_MOBILE;
+  detectMobile();
+  // bigger cells on mobile for legibility — sized to the narrowest dimension
+  if(IS_MOBILE){
+    cell = Math.max(14, Math.min(22, Math.floor(Math.min(w,h)/26)));
+  } else {
+    cell = Math.max(11, Math.min(18, Math.floor(Math.min(w,h)/52)));
+  }
   cols = Math.floor(w/cell);
   rows = Math.floor(h/cell);
   putBg = makePut(ctx, cell);
   putPop = makePut(pctx, cell);
-  // tell every window to refresh its inner canvas
+  // refresh layouts that depend on cell size / mobile flag
+  if(wasMobile !== IS_MOBILE && icons && icons.length){
+    icons = defaultIconLayout();
+  }
+  // re-center any open windows in mobile mode
+  if(IS_MOBILE){
+    for(const w of windows) applyMobileFullscreen(w);
+  }
   for(const win of windows) if(win.kind==='builtin' && win.instance && win.instance.resize) win.instance.resize();
+}
+function applyMobileFullscreen(win){
+  win.x = 0;
+  win.y = 0;
+  win.w = window.innerWidth;
+  win.h = window.innerHeight - cell*2; // leave space for bottom home bar
+  applyWinRect(win);
+  if(win.canvasEl) sizeBuiltinCanvas(win);
 }
 window.addEventListener('resize', resize);
 
@@ -226,6 +270,24 @@ const ICONS_KEY = 'cwos.icons.v1';
 let icons = []; // [{appId, c, r}]
 function defaultIconLayout(){
   const out=[];
+  if(IS_MOBILE){
+    // phone-style centered grid, 3 columns, generous spacing
+    const cols_n = Math.max(2, Math.min(3, Math.floor((cols - 2) / (ICON_W + 2))));
+    const rowH = ICON_H + 2;
+    const gridW = cols_n * (ICON_W + 2) - 2;
+    const c0 = Math.max(1, Math.floor((cols - gridW) / 2));
+    const totalRows = Math.ceil(APPS.length / cols_n);
+    const gridH = totalRows * rowH - 2;
+    const r0 = Math.max(2, Math.floor((rows - gridH - 3) / 2));
+    let i = 0;
+    for(const a of APPS){
+      const col = i % cols_n;
+      const row = Math.floor(i / cols_n);
+      out.push({appId:a.id, c: c0 + col*(ICON_W+2), r: r0 + row*rowH});
+      i++;
+    }
+    return out;
+  }
   let c=2, r=2;
   for(const a of APPS){
     out.push({appId:a.id, c, r});
@@ -292,6 +354,15 @@ function focusWindow(win){
 }
 
 function spawnWindow(app, opts={}){
+  // mobile: only one app open at a time, fullscreen
+  if(IS_MOBILE){
+    for(const w of windows.slice()) closeWindow(w);
+    opts.x = 0;
+    opts.y = 0;
+    opts.w = window.innerWidth;
+    opts.h = window.innerHeight - cell*2; // leave room for bottom home bar
+    startMenuOpen = false;
+  }
   const w = opts.w ?? Math.min(720, Math.floor(window.innerWidth*0.6));
   const h = opts.h ?? Math.min(520, Math.floor(window.innerHeight*0.65));
   const x = opts.x ?? Math.floor((window.innerWidth - w)/2 + (windows.length%5)*22);
@@ -305,11 +376,11 @@ function spawnWindow(app, opts={}){
 
   const titleEl = document.createElement('div');
   titleEl.className = 'titlebar';
-  const glyph = document.createElement('span'); glyph.className='glyph'; glyph.textContent='▓';
-  const name = document.createElement('span'); name.className='name'; name.textContent = ' '+app.label+' '+(app.kind==='iframe'?'· '+app.src:'· '+app.id);
+  const glyph = document.createElement('span'); glyph.className='glyph'; glyph.textContent = IS_MOBILE ? '◂' : '▓';
+  const name = document.createElement('span'); name.className='name'; name.textContent = IS_MOBILE ? ' '+app.label : ' '+app.label+' '+(app.kind==='iframe'?'· '+app.src:'· '+app.id);
   const minBtn = document.createElement('span'); minBtn.className='ctrl min'; minBtn.textContent='─';
   const maxBtn = document.createElement('span'); maxBtn.className='ctrl max'; maxBtn.textContent='□';
-  const closeBtn = document.createElement('span'); closeBtn.className='ctrl close'; closeBtn.textContent='×';
+  const closeBtn = document.createElement('span'); closeBtn.className='ctrl close'; closeBtn.textContent = IS_MOBILE ? '⌂' : '×';
   titleEl.appendChild(glyph); titleEl.appendChild(name); titleEl.appendChild(minBtn); titleEl.appendChild(maxBtn); titleEl.appendChild(closeBtn);
 
   const contentEl = document.createElement('div');
@@ -351,8 +422,9 @@ function spawnWindow(app, opts={}){
     win.instance.mount();
   }
 
-  // titlebar drag
+  // titlebar drag — desktop only
   titleEl.addEventListener('mousedown', (e)=>{
+    if(IS_MOBILE) return;
     if(e.target===closeBtn || e.target===minBtn || e.target===maxBtn) return;
     focusWindow(win);
     titleEl.classList.add('dragging');
@@ -445,6 +517,11 @@ window.addEventListener('mousemove', (e)=>{
   mouseR = Math.floor(mouseY/cell);
   if(!dragOp) return;
   if(dragOp.kind==='icon'){
+    // mobile: never drag — preserve as a tap-only interaction
+    if(IS_MOBILE){
+      dragOp.moved = (Math.abs(e.clientX-dragOp.startX)>14 || Math.abs(e.clientY-dragOp.startY)>14);
+      return;
+    }
     dragOp.ic.c = Math.max(0, Math.min(cols-ICON_W, Math.floor(mouseX/cell) - dragOp.ox));
     dragOp.ic.r = Math.max(0, Math.min(rows-ICON_H-2, Math.floor(mouseY/cell) - dragOp.oy));
     dragOp.moved = dragOp.moved || (Math.abs(e.clientX-dragOp.startX)>4 || Math.abs(e.clientY-dragOp.startY)>4);
@@ -777,7 +854,41 @@ function drawSortBars(c0, r0){
     putBg.put(ch, c0+i, r0, col, 0.9);
   }
 }
+function drawMobileBar(){
+  const r0 = rows-1;
+  // top-bar status strip
+  const time = clockStr();
+  const t0r = 0;
+  ctx.fillStyle = PANEL;
+  ctx.fillRect(0, 0, cv_w(), cell);
+  for(let c=0;c<cols;c++) putBg.put('─', c, 0, LOW, 0.55);
+  // OS name on the left, time on the right
+  putBg.text('CHARACTERWORLD/OS', 1, t0r, MID, 0.85);
+  putBg.text(time, cols - time.length - 1, t0r, CURSOR, 1);
+
+  // bottom home bar
+  const r = rows-1;
+  ctx.fillStyle = PANEL;
+  ctx.fillRect(0, (r-1)*cell + cell*0.3, cv_w(), cell*1.7);
+  for(let c=0;c<cols;c++) putBg.put('─', c, r-1, LOW, 0.6);
+  // home button (centered)
+  const homeLbl = ' ⌂ ';
+  const hc = Math.floor((cols - homeLbl.length)/2);
+  for(let i=0;i<homeLbl.length;i++){
+    const col = homeLbl[i]==='⌂' ? CURSOR : INK;
+    putBg.put(homeLbl[i], hc+i, r, col, 1);
+  }
+  taskbarStartHit = {c:hc, r, w:homeLbl.length, h:1};
+  // current app name on the left if a window is open
+  const open = windows.find(w=>!w.minimized);
+  if(open){
+    putBg.text(open.app.label, 2, r, open.app.accent || HI, 1);
+  }
+  taskbarPills = [];
+  taskbarClockHit = null;
+}
 function drawTaskbar(){
+  if(IS_MOBILE){ drawMobileBar(); return; }
   const r0 = rows-1;
   // panel band — solid dark fill across the whole row + 1px above
   ctx.fillStyle = PANEL;
@@ -843,6 +954,7 @@ function cv_w(){ return bg.width / dpr }
 
 let startMenuHits=[];
 function drawStartMenu(){
+  if(IS_MOBILE){ startMenuHits=[]; return; } // mobile uses the icon grid as home
   if(!startMenuOpen){ startMenuHits=[]; return; }
   const w = 24, h = APPS.length + 6;
   const c0 = 1, r0 = Math.max(2, rows - 1 - h);
@@ -953,7 +1065,15 @@ bg.addEventListener('mousedown', (e)=>{
   }
   if(taskbarStartHit){
     const h = taskbarStartHit;
-    if(c>=h.c && c<h.c+h.w && r>=h.r && r<h.r+h.h){ startMenuOpen = true; return; }
+    if(c>=h.c && c<h.c+h.w && r>=h.r && r<h.r+h.h){
+      if(IS_MOBILE){
+        // home button — close all open windows and return to icon grid
+        for(const w of windows.slice()) closeWindow(w);
+      } else {
+        startMenuOpen = true;
+      }
+      return;
+    }
   }
   for(const p of taskbarPills){
     if(c>=p.c && c<p.c+p.w && r>=p.r && r<p.r+p.h){
